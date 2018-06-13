@@ -147,6 +147,35 @@ by refine {..}; simp [hf.add, hf.smul, add_smul, smul_smul]
 
 end is_linear_map
 
+namespace restriction_of_scalars
+
+variables {R : Type u} [ring R]
+variables {S : Type v} [ring S]
+variables (f : R → S)  [is_ring_hom f]
+variables (M : Type w) [module S M]
+
+definition restriction_of_scalars : module R M :=
+{ smul     := λ r m, f(r) • m,
+  smul_add := λ _ _ _, smul_add,
+  add_smul := λ r s m, begin
+    show f (r + s) • m = f(r) • m + f(s) • m,
+    rw is_ring_hom.map_add f,
+    apply add_smul,
+  end,
+  mul_smul := λ r s m, begin
+    show f (r * s) • m = f(r) • f(s) • m,
+    rw is_ring_hom.map_mul f,
+    apply mul_smul
+  end,
+  one_smul := λ m, begin
+    show f (1) • m = m,
+    rw is_ring_hom.map_one f,
+    apply one_smul,
+  end,
+}
+
+end restriction_of_scalars
+
 /-- A submodule of a module is one which is closed under vector operations.
   This is a sufficient condition for the subset of vectors in the submodule
   to themselves form a module. -/
