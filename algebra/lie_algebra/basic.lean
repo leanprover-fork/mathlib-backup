@@ -20,26 +20,31 @@ section from_ring
 
 variables {S : Type*} [ring S]
 variables {f : R → S}  [is_ring_hom f]
+variable  {central : ∀ (r : R) (s : S), f(r) * s = s * f(r)}
 
 instance commutator_bracket : has_bracket S := ⟨λ x y, x*y - y*x⟩
 
--- instance from_ring_to_module : module R S :=
--- --  sorry
---  restriction_of_scalars.restriction_of_scalars f S
-
+include central
 definition ring.to_lie_algebra : lie_algebra R S :=
 { left_linear  := begin
     intro y,
     dsimp [commutator_bracket],
     constructor,
     { intros x₁ x₂,
-      sorry },
-    { sorry }
+      simp [left_distrib,right_distrib,mul_assoc] },
+    { intros r x,
+      show f r * x * y + -(y * (f r * x)) = f r * (x * y + -(y * x)),
+      simp [left_distrib,right_distrib,mul_assoc,central] }
   end,
   right_linear := begin
     intro x,
     dsimp [commutator_bracket],
-    sorry
+    constructor,
+    { intros x₁ x₂,
+      simp [left_distrib,right_distrib,mul_assoc] },
+    { intros r y,
+      show x * (f r * y) + -(f r * y * x) = f r * (x * y + -(y * x)),
+      simp [left_distrib,right_distrib,mul_assoc,central] }
   end,
   alternating  := begin
     intro x,
@@ -49,7 +54,7 @@ definition ring.to_lie_algebra : lie_algebra R S :=
   Jacobi_identity := begin
     intros x y z,
     dsimp [commutator_bracket],
-    ring,
+    simp [left_distrib,right_distrib,mul_assoc],
   end,
   anti_comm := begin
     intros x y,
@@ -58,11 +63,6 @@ definition ring.to_lie_algebra : lie_algebra R S :=
   end,
   ..restriction_of_scalars.restriction_of_scalars f S
 }
--- begin
---   constructor,
---   {  },
---   sorry
--- end
 
 end from_ring
 
@@ -70,12 +70,6 @@ end from_ring
 class is_lie_subalgebra (𝔥 : set 𝔤) extends is_submodule 𝔥 :=
 (closed {x y} : x ∈ 𝔥 → y ∈ 𝔥 → [x,y] ∈ 𝔥)
 
-instance subset.lie_algebra {𝔥 : set 𝔤} [is_lie_subalgebra 𝔥] : lie_algebra R 𝔥 :=
-{
-  sorry
-}
--- { add_comm      := assume ⟨a,_⟩ ⟨b,_⟩, subtype.eq $ add_comm _ _,
---   left_distrib  := assume ⟨a,_⟩ ⟨b,_⟩ ⟨c,_⟩, subtype.eq $ left_distrib _ _ _,
---   right_distrib := assume ⟨a,_⟩ ⟨b,_⟩ ⟨c,_⟩, subtype.eq $ right_distrib _ _ _,
---   .. subtype.add_group,
---   .. subtype.monoid }
+-- We are not ready for this instance...
+-- Lean does not yet know that a submodule is a module.
+-- instance subset.lie_algebra {𝔥 : set 𝔤} [is_lie_subalgebra 𝔥] : lie_algebra R 𝔥 := {}
