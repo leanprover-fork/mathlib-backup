@@ -6,7 +6,7 @@ Authors: Nathaniel Thomas, Jeremy Avigad, Johannes Hölzl
 Modules over a ring.
 -/
 
-import algebra.ring algebra.big_operators data.set.lattice
+import algebra.ring algebra.big_operators data.set.lattice group_theory.add_subgroup
 open function
 
 universes u v w x
@@ -75,7 +75,7 @@ instance ring.to_module [r : ring α] : module α α :=
 
 @[simp] lemma smul_eq_mul [ring α] {a a' : α} : a • a' = a * a' := rfl
 
-structure is_linear_map {α : Type u} {β : Type v} {γ : Type w} [ring α] [module α β] [module α γ]
+class is_linear_map {α : Type u} {β : Type v} {γ : Type w} [ring α] [module α β] [module α γ]
   (f : β → γ) : Prop :=
 (add  : ∀x y, f (x + y) = f x + f y)
 (smul : ∀c x, f (c • x) = c • f x)
@@ -104,7 +104,7 @@ by simp [hf.neg, hf.add]
 
 end
 
-lemma comp {g : δ → β} (hf : is_linear_map f) (hg : is_linear_map g) : is_linear_map (f ∘ g) :=
+instance comp {g : δ → β} [hf : is_linear_map f] [hg : is_linear_map g] : is_linear_map (f ∘ g) :=
 by refine {..}; simp [(∘), hg.add, hf.add, hg.smul, hf.smul]
 
 lemma id : is_linear_map (id : β → β) :=
@@ -147,7 +147,7 @@ by refine {..}; simp [hf.add, hf.smul, add_smul, smul_smul]
 
 end is_linear_map
 
-namespace restriction_of_scalars
+namespace module
 
 variables {R : Type u} [ring R]
 variables {S : Type v} [ring S]
@@ -156,7 +156,9 @@ variables (M : Type w) [module S M]
 
 definition restriction_of_scalars : module R M :=
 { smul     := λ r m, f(r) • m,
-  smul_add := λ _ _ _, smul_add,
+  smul_add := λ r m₁ m₂, begin
+    apply smul_add
+  end,
   add_smul := λ r s m, begin
     show f (r + s) • m = f(r) • m + f(s) • m,
     rw is_ring_hom.map_add f,
@@ -174,7 +176,7 @@ definition restriction_of_scalars : module R M :=
   end,
 }
 
-end restriction_of_scalars
+end module
 
 /-- A submodule of a module is one which is closed under vector operations.
   This is a sufficient condition for the subset of vectors in the submodule
@@ -257,6 +259,54 @@ end
 
 end is_submodule
 
+instance subset.add_submonoid {α : Type u} {β : Type v} [ring α] [module α β] (p : set β) [hp : is_submodule p] :
+is_add_submonoid p :=
+{ zero_mem := is_submodule.zero,
+  add_mem  := λ _ _, is_submodule.add }
+
+instance subset.add_subgroup {α : Type u} {β : Type v} [ring α] [module α β] (p : set β) [hp : is_submodule p] :
+is_add_subgroup p :=
+{ neg_mem := λ x hx, begin
+  rw ←neg_one_smul,
+  apply is_submodule.smul,
+  exact hx
+end }
+
+instance subset.has_scalar {α : Type u} {β : Type v} [ring α] [module α β] (p : set β) [hp : is_submodule p] :
+has_scalar α p :=
+{ smul := begin
+intros c x,
+refine ⟨c • x.1, _⟩,
+apply hp.smul,
+exact x.property
+end }
+
+instance subset.module {α : Type u} {β : Type v} [ring α] [module α β] (p : set β) [hp : is_submodule p] :
+module α p :=
+{ add_comm := assume ⟨a,_⟩ ⟨b,_⟩, subtype.eq $ add_comm _ _,
+  smul_add := begin
+    intros r s x,
+    apply subtype.eq,
+    apply smul_add,
+  end,
+  add_smul := begin
+    intros r s x,
+    apply subtype.eq,
+    apply add_smul,
+  end,
+  mul_smul := begin
+    intros r s x,
+    apply subtype.eq,
+    apply mul_smul,
+  end,
+  one_smul := begin
+    intros x,
+    apply subtype.eq,
+    apply one_smul,
+  end,
+  .. subtype.add_group,
+}
+
 section comm_ring
 
 theorem is_submodule.eq_univ_of_contains_unit {α : Type u} [comm_ring α] (S : set α) [is_submodule S]
@@ -277,9 +327,13 @@ end comm_ring
   This is the traditional generalization of spaces like `ℝ^n`, which have a natural
   addition operation and a way to multiply them by real numbers, but no multiplication
   operation between vectors. -/
-class vector_space (α : out_param $ Type u) (β : Type v) [field α] extends module α β
+@[reducible] def vector_space (α : Type u) (β : Type v) [field α] := module α β
 
 /-- Subspace of a vector space. Defined to equal `is_submodule`. -/
 @[reducible] def subspace {α : Type u} {β : Type v} [field α] [vector_space α β] (p : set β) :
   Prop :=
 is_submodule p
+
+-- This also needs some finitely generatedness assumption
+def vector_space.endomorphism.trace {K : Type u} [field K] {V : Type v} [vector_space K V] (f : V → V) [is_linear_map f] :
+K := sorry

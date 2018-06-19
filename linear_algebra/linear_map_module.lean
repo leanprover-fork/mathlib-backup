@@ -230,3 +230,18 @@ def general_linear_group :=
 by haveI := endomorphism_ring α β; exact units (linear_map β β)
 
 end module
+
+namespace module
+variables (α β)
+variables [comm_ring α] [module α β]
+include α β
+
+def dual := linear_map β α
+
+instance dual.is_module : module α (dual α β) :=
+begin
+  unfold dual,
+  apply_instance
+end
+
+end module
