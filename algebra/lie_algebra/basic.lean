@@ -174,7 +174,6 @@ begin
   sorry
 end
 
-
 theorem scalar_multiple_root (α ∈ (@Φ _ _ _ _ isC)) (c : ℂ) : (c • α) ∈ (@Φ _ _ _ _ isC) →
 c = 1 ∨ c = -1 :=
 begin
