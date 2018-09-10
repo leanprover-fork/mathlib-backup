@@ -242,10 +242,6 @@ lemma filtered'_implies_filtered'' (h : kappa_filtered' κ C) : kappa_filtered''
         ... = e X ≫ (g f₀).snd ≫ j f₀ ≫ k                         : by rw this⟩)
     (λ nohoms, ⟨Z₀, λ X, e X, λ X Y f, by refine absurd _ nohoms; exact ⟨⟨X, Y, f⟩⟩⟩) }
 
--- TODO: Move this
-lemma hpropext {p q : Prop} (a : p) (b : q) : a == b :=
-proof_irrel_heq (propext ⟨λ _, b, λ _, a⟩) a b
-
 lemma filtered''_implies_filtered (h : kappa_filtered'' κ C) : kappa_filtered κ C :=
 { cocone_functor := assume I catI hI F, by letI := catI; exact
   let S : subgraph C :=
@@ -260,15 +256,8 @@ lemma filtered''_implies_filtered (h : kappa_filtered'' κ C) : kappa_filtered �
     refine lt_of_le_of_lt _ hI,
     refine ge_of_surjective
       (λ ijg, ⟨⟨F ijg.1, ijg.1, rfl⟩, ⟨F ijg.2.1, ijg.2.1, rfl⟩, F.map ijg.2.2, ijg, rfl, rfl, heq.rfl⟩) _,
-    rintro ⟨⟨X, i, rfl⟩, ⟨Y, j, rfl⟩, ⟨f, ⟨i', j', g⟩, hi', hj', hg⟩⟩,
-    refine ⟨⟨i', j', g⟩, _⟩, dsimp,
-    dsimp at hi' hj' hg,
-    change F i ⟶ F j at f,
-    congr' 1, { exact subtype.eq hi' },
-    -- I don't know what the goals these rws are solving are
-    congr' 1, { rw hi' }, { exact subtype.eq hj' },
-    congr' 1, { rw [hi', hj'] }, { rw [hi', hj'] }, exact hg,
-    apply hpropext
+    rintro ⟨⟨X, _⟩, ⟨Y, _⟩, ⟨f, ijg, ⟨⟩, ⟨⟩, ⟨⟩⟩⟩,
+    exact ⟨ijg, rfl⟩
   end,
   let ⟨Z, g, hg⟩ := h.cocone_subgraph S ⟨hS₀, hS₁⟩ in
   ⟨{ X := Z, ι := λ i, g ⟨F i, i, rfl⟩,
