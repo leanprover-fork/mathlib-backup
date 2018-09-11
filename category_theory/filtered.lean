@@ -7,6 +7,7 @@ import category_theory.category
 import category_theory.functor
 import category_theory.limits.shape -- for cocone
 import category_theory.preorder
+import category_theory.products
 import set_theory.cofinality
 
 universes u u' v'
@@ -108,6 +109,104 @@ begin
   apply small_of_small_sigma_of_small κ h₀, intro Y,
   exact h₁ X Y
 end
+
+section subgraph_stuff
+variables {C : Type u} [small_category C]
+
+def le_subgraph (S T : subgraph C) : Prop :=
+∃ h₀ : S.objs ⊆ T.objs, ∀ (X Y : S.objs),
+  S.homs X Y ⊆ T.homs ⟨X.1, by exact h₀ X.2⟩ ⟨Y.1, by exact h₀ Y.2⟩
+
+instance : preorder (subgraph C) :=
+{ le := le_subgraph,
+  le_refl := by tidy,
+  le_trans := λ S T U hST hTU, ⟨by tidy, begin
+    rcases hST with ⟨_, hST₂⟩, rcases hTU with ⟨_, hTU₂⟩,
+    intros X Y f hf, exact hTU₂ _ _ (hST₂ _ _ hf)
+  end⟩ }
+
+section singleton_subgraph
+variables (c : C)
+
+inductive singleton_objs : set C
+| is_c : singleton_objs c
+open singleton_objs
+
+inductive singleton_homs : Π (X Y : singleton_objs c), set (X.1 ⟶ Y.1)
+| is_id_c : singleton_homs ⟨c, is_c c⟩ ⟨c, is_c c⟩ (category.id c)
+
+def singleton_subgraph : subgraph C :=
+{ objs := singleton_objs c, homs := singleton_homs c }
+
+lemma singleton_subgraph_is_small : (singleton_subgraph c).is_kappa_small κ := sorry
+
+end singleton_subgraph
+
+section single_morphism_subgraph
+variables {c d : C} (f : c ⟶ d)
+include f
+
+inductive single_morphism_objs : set C
+| src : single_morphism_objs c
+| tgt : single_morphism_objs d
+open single_morphism_objs
+
+inductive single_morphism_homs : Π (X Y : single_morphism_objs f), set (X.1 ⟶ Y.1)
+| is_f : single_morphism_homs ⟨c, src f⟩ ⟨d, tgt f⟩ f
+
+def single_morphism_subgraph : subgraph C :=
+{ objs := single_morphism_objs f, homs := single_morphism_homs f }
+
+lemma single_morphism_subgraph_is_small : (single_morphism_subgraph f).is_kappa_small κ := sorry
+
+end single_morphism_subgraph
+
+section union_subgraph
+variables {ι : Type u} (S : ι → subgraph C)
+
+inductive union_subgraph_objs : set C
+| mem_obj : Π (i : ι) (X : C) (hX : X ∈ (S i).objs), union_subgraph_objs X
+open union_subgraph_objs
+
+inductive union_subgraph_homs : Π (X Y : union_subgraph_objs S), set (X.1 ⟶ Y.1)
+| mem_hom : Π (i : ι) (X Y : (S i).objs) (f : X.1 ⟶ Y.1) (hf : f ∈ (S i).homs X Y),
+  union_subgraph_homs ⟨X.1, mem_obj i _ X.2⟩ ⟨Y.1, mem_obj i _ Y.2⟩ f
+
+def union_subgraph : subgraph C :=
+{ objs := union_subgraph_objs S, homs := union_subgraph_homs S }
+
+lemma subgraph_union (i : ι) : S i ≤ union_subgraph S :=
+⟨assume X hX, mem_obj i X hX,
+ assume X Y f hf, union_subgraph_homs.mem_hom i X Y f hf⟩
+
+lemma union_small_of_small (hι : card ι < κ) (h : ∀ i, (S i).is_kappa_small κ) :
+  (union_subgraph S).is_kappa_small κ :=
+sorry
+
+end union_subgraph
+
+section image_subgraph
+variables {D : Type u} [small_category D]
+variables (F : C ↝ D) (S : subgraph C)
+
+inductive image_subgraph_objs : set D
+| img_obj : Π (X : S.objs), image_subgraph_objs (F X)
+open image_subgraph_objs
+
+inductive image_subgraph_homs : Π (X Y : image_subgraph_objs F S), set (X.1 ⟶ Y.1)
+| img_hom : Π (X Y : S.objs) (f : X.1 ⟶ Y.1) (hf : f ∈ S.homs X Y),
+  image_subgraph_homs ⟨F X.1, img_obj F X⟩ ⟨F Y.1, img_obj F Y⟩ (F.map f)
+
+def image_subgraph : subgraph D :=
+{ objs := image_subgraph_objs F S, homs := image_subgraph_homs F S }
+
+lemma image_small_of_small (hS : S.is_kappa_small κ) : (image_subgraph F S).is_kappa_small κ :=
+sorry
+-- TODO: We actually proved this already, below. Move that proof here
+
+end image_subgraph
+end subgraph_stuff
+
 
 structure kappa_filtered'' (C : Type u) [small_category C] : Prop :=
 (cocone_subgraph : ∀ (S : subgraph C) (h : S.is_kappa_small κ),
@@ -275,18 +374,6 @@ lemma filtered''_iff_filtered : kappa_filtered'' κ C ↔ kappa_filtered κ C :=
 
 section directed_from_filtered
 
-def le_subgraph (S T : subgraph C) : Prop :=
-∃ h₀ : S.objs ⊆ T.objs, ∀ (X Y : S.objs),
-  S.homs X Y ⊆ T.homs ⟨X.1, by exact h₀ X.2⟩ ⟨Y.1, by exact h₀ Y.2⟩
-
-instance : preorder (subgraph C) :=
-{ le := le_subgraph,
-  le_refl := by tidy,
-  le_trans := λ S T U hST hTU, ⟨by tidy, begin
-    rcases hST with ⟨_, hST₂⟩, rcases hTU with ⟨_, hTU₂⟩,
-    intros X Y f hf, exact hTU₂ _ _ (hST₂ _ _ hf)
-  end⟩ }
-
 -- We will need all the following properties of Z to define the functor I → C:
 -- 1. For every X ∈ S, there is a unique map e_X : X → Z that belongs to S.
 -- 2. The identity of Z belongs to S (so e_Z = 𝟙 Z).
@@ -295,86 +382,196 @@ instance : preorder (subgraph C) :=
 structure is_end (S : subgraph C) (Z : S.objs) :=
 (e : Π (X : S.objs), X.1 ⟶ Z.1)
 (mem : ∀ (X : S.objs), e X ∈ S.homs X Z)
-(unique : ∀ (X : S.objs) (e' : S.homs X Z), e'.1 = e X)
 (id : e Z = category.id Z)
+-- TODO: ⦃X Y⦄?
 (comp : ∀ (X Y : S.objs) (f : X.1 ⟶ Y.1) (hf : f ∈ S.homs X Y), f ≫ e Y = e X)
 
-instance (S : subgraph C) (Z : S.objs) : subsingleton (is_end S Z) := sorry
-
-def is_good (S : subgraph C) : Prop := is_singleton {Z : S.objs // nonempty (is_end S Z)}
-
 variables (C)
-def I : Type u := {S : subgraph C // S.is_kappa_small κ ∧ is_good S}
+-- The proof in [A&R] considers subcategories with a unique terminal
+-- object. We've replaced subcategories with subgraphs and a terminal
+-- object with an "end" as defined above. But the end does not
+-- actually have to be unique either, it just needs to be chosen along
+-- with the subgraph.
+structure I : Type u :=
+(S : subgraph C)
+(hS : S.is_kappa_small κ)
+(Z : S.objs)
+(hZ : is_end S Z)
 
 instance I.preorder : preorder (I κ C) :=
 { le := λ S T, S.1 ≤ T.1,
   le_refl := λ S, le_refl S.1,
   le_trans := λ S T U hST hTU, le_trans hST hTU }
 
-section
-variables (C)
-def part_I_condition : Prop :=
-∀ (S : subgraph C), S.is_kappa_small κ →
-  ∃ T : subgraph C, T.is_kappa_small κ ∧ le_subgraph S T ∧ is_good T
-
-variables (hC : part_I_condition κ C)
-
-lemma I_kappa_directed {α : Type u} (hα : card α < κ) (f : α → I κ C) : ∃ T, ∀ a, f a ≤ T :=
-let S : subgraph C :=
-      { objs := ⋃ (a : α), (f a).1.objs,
-        homs := λ X Y, ⋃ (a : {a : α // X.1 ∈ (f a).1.objs ∧ Y.1 ∈ (f a).1.objs}),
-          (f a.1).1.homs ⟨X, a.2.1⟩ ⟨Y, a.2.2⟩ },
-    ⟨T, h₁, h₂, h₃⟩ := hC S $ begin
-      apply subgraph.kappa_small_of_ob_and_hom_small,
-      { apply small_of_small_union_of_small, { exact hα }, { exact (λ a, (f a).2.1.1) } },
-      { intros X Y,
-        apply small_of_small_union_of_small,
-        { exact lt_of_le_of_lt le_of_subtype hα },
-        { rintro ⟨a, aX, aY⟩, apply subgraph.hom_small_of_kappa_small, exact (f a).2.1 } }
-    end in
-⟨⟨T, h₁, h₃⟩, assume a, show (f a).1 ≤ T, begin
-  refine le_trans _ h₂,
-  refine ⟨subset_Union (λ a, (f a).1.objs) a, _⟩,
-  rintros ⟨_,X₂⟩ ⟨_,Y₂⟩ f hf, simp, exact ⟨a, ⟨X₂, Y₂⟩, hf⟩
- end⟩
-
-variables {κ C}
-noncomputable def the_end (S : I κ C) : S.1.objs :=
-let h := choice (S.2.2) in h.symm ()
-
-def the_end_is_end (S : I κ C) : is_end S.1 (the_end S) := sorry
-
-variables (κ C)
-noncomputable def F : I κ C ↝ C :=
-{ obj := λ S, the_end S,
-  map' := λ S T h, (the_end_is_end T).e ⟨(the_end S).1, (Exists.fst h.down.down) (the_end S).2⟩,
-  map_id' := λ S, begin
-    convert is_end.id (the_end_is_end S), apply subtype.eq, refl
-  end,
-  map_comp' := λ S T U hST hTU, begin
-    symmetry,
-    -- TODO: Clean this up
-    apply (the_end_is_end U).comp
-      ⟨(the_end S).1, (Exists.fst (hST ≫ hTU).down.down) (the_end S).2⟩
-      ⟨(the_end T).1, (Exists.fst hTU.down.down) (the_end T).2⟩,
-    rcases hTU with ⟨⟨⟨h₁, h₂⟩⟩⟩,
-    apply h₂,
-    apply (the_end_is_end T).mem
-  end }
-
--- Next, we have to prove that F is cofinal.  This is not the real
--- definition, but good enough for our purposes (it is what we are
--- going to prove anyways).
+-- This is not the real definition, but good enough for our purposes
+-- (it is what we are going to prove anyways).
 variables {C}
 def cofinal {J : Type u} [small_category J] (G : J ↝ C) : Prop :=
 (∀ c, ∃ i, nonempty (c ⟶ G i)) ∧
 (∀ c i i' (f : c ⟶ G i) (f' : c ⟶ G i'), ∃ i'' (g : i ⟶ i'') (g' : i' ⟶ i''),
   f ≫ G.map g = f' ≫ G.map g')
 
-lemma cofinal_F : cofinal (F κ C) :=
-sorry
+variables (C)
+structure conclusion :=
+(I : Type u)
+[preI : preorder I]
+(hI : kappa_filtered κ I)       -- TODO: kappa_directed, for preorders?
+(F : I ↝ C)
+(hF : cofinal F)
 
-end
+section part_I
+def part_I_condition : Prop :=
+∀ (S : subgraph C), S.is_kappa_small κ → ∃ (T : I κ C), S ≤ T.S
+
+variables (hC : part_I_condition κ C)
+
+variables {κ C}
+lemma I_kappa_directed {α : Type u} (hα : card α < κ) (f : α → I κ C) : ∃ T, ∀ a, f a ≤ T :=
+let S : subgraph C :=
+      { objs := ⋃ (a : α), (f a).S.objs,
+        homs := λ X Y, ⋃ (a : {a : α // X.1 ∈ (f a).S.objs ∧ Y.1 ∈ (f a).S.objs}),
+          (f a.1).S.homs ⟨X, a.2.1⟩ ⟨Y, a.2.2⟩ },
+    ⟨T, h⟩ := hC S $ begin
+      apply subgraph.kappa_small_of_ob_and_hom_small,
+      { apply small_of_small_union_of_small, { exact hα }, { exact (λ a, (f a).hS.1) } },
+      { intros X Y,
+        apply small_of_small_union_of_small,
+        { exact lt_of_le_of_lt le_of_subtype hα },
+        { rintro ⟨a, aX, aY⟩, apply subgraph.hom_small_of_kappa_small, exact (f a).hS } }
+    end in
+⟨T, assume a, show (f a).S ≤ T.S, begin
+  refine le_trans _ h,
+  refine ⟨subset_Union (λ a, (f a).S.objs) a, _⟩,
+  rintros ⟨_,X₂⟩ ⟨_,Y₂⟩ f hf, simp, exact ⟨a, ⟨X₂, Y₂⟩, hf⟩
+ end⟩
+
+-- TODO: general equivalence between kappa_directed & kappa_filtered for preorders
+lemma I_kappa_filtered : kappa_filtered κ (I κ C) :=
+(filtered'_iff_filtered κ).mp
+  { cocone_objs := λ α hα F, let ⟨T, hT⟩ := I_kappa_directed hC hα F in ⟨⟨T, λ a, ⟨⟨hT a⟩⟩⟩⟩,
+    cocone_parallel := λ _ Y _ _ _, ⟨Y, category.id Y, by tidy⟩ }
+
+variables (κ C)
+def F : I κ C ↝ C :=
+{ obj := λ S, S.Z,
+  map' := λ S T h, T.hZ.e ⟨S.Z.1, (Exists.fst h.down.down) S.Z.2⟩,
+  map_id' := λ S, by convert S.hZ.id; simp,
+  map_comp' := λ S T U hST hTU, begin
+    symmetry,
+    -- TODO: Clean this up
+    apply U.hZ.comp
+      ⟨S.Z.1, (Exists.fst (hST ≫ hTU).down.down) S.Z.2⟩
+      ⟨T.Z.1, (Exists.fst hTU.down.down) T.Z.2⟩,
+    rcases hTU with ⟨⟨⟨h₁, h₂⟩⟩⟩,
+    apply h₂,
+    apply T.hZ.mem
+  end }
+
+-- Next, we have to prove that F is cofinal.
+variables {C}
+
+inductive union_index : Type u
+| uS | uT | uf | uf'
+open union_index
+
+instance union_index.fintype : fintype union_index := sorry
+
+include hC
+local attribute [elab_simple] subgraph_union
+lemma cofinal_F : cofinal (F κ C) :=
+⟨begin
+   intro c,
+   refine ⟨⟨singleton_subgraph c, _, ⟨c, singleton_objs.is_c c⟩, ⟨_, _, _, _⟩⟩, ⟨category.id c⟩⟩,
+   { exact singleton_subgraph_is_small κ c },
+   { rintro ⟨_, ⟨⟩⟩, apply category.id },
+   { rintro ⟨_, ⟨⟩⟩, exact singleton_homs.is_id_c c },
+   { refl },
+   { rintros ⟨_, ⟨⟩⟩ ⟨_, ⟨⟩⟩ f ⟨⟩, simp }
+ end,
+ begin
+   intros c S T f f',
+   let U_ : union_index → subgraph C := λ i, match i with
+   | uS := S.S
+   | uT := T.S
+   | uf := single_morphism_subgraph f
+   | uf' := single_morphism_subgraph f'
+   end,
+   let U₀ := union_subgraph U_,
+   have U_small : ∀ i, (U_ i).is_kappa_small κ := λ i, match i with
+   | uS := S.hS
+   | uT := T.hS
+   | uf := single_morphism_subgraph_is_small κ f
+   | uf' := single_morphism_subgraph_is_small κ f'
+   end,
+   have U₀_small : U₀.is_kappa_small κ := union_small_of_small κ U_ (is_small_of_finite κ) U_small,
+   rcases hC U₀ U₀_small with ⟨U, hU⟩,
+   refine ⟨U, ⟨⟨_⟩⟩, ⟨⟨_⟩⟩, _⟩,
+   -- TODO: Refactor all this reasoning about membership/subgraphs (also in def of F)
+   { change S.S ≤ U.S, exact le_trans (subgraph_union U_ uS) hU },
+   { change T.S ≤ U.S, exact le_trans (subgraph_union U_ uT) hU },
+   { have : c ∈ U.S.objs := (le_trans (subgraph_union U_ uf) hU).fst (single_morphism_objs.src f),
+     have h1 := U.hZ.comp ⟨c, this⟩ ⟨_, (le_trans (subgraph_union U_ uS) hU).fst S.Z.2⟩ f
+       (by rcases le_trans (subgraph_union U_ uf) hU with ⟨_, hhom⟩;
+           exact hhom _ _ (single_morphism_homs.is_f f)),
+     have h2 := U.hZ.comp ⟨c, this⟩ ⟨_, (le_trans (subgraph_union U_ uT) hU).fst T.Z.2⟩ f'
+       (by rcases le_trans (subgraph_union U_ uf') hU with ⟨_, hhom⟩;
+           exact hhom _ _ (single_morphism_homs.is_f f')),
+     erw [h1, h2] }
+ end⟩
+
+lemma part_I : nonempty (conclusion κ C) :=
+⟨⟨I κ C, I_kappa_filtered hC, F κ C, cofinal_F κ hC⟩⟩
+
+end part_I
+
+section part_II
+
+-- Now we show that if K is a set of cardinality κ which we view as an
+-- indiscrete category, then C × K has the property required for
+-- part_I and the functor C × K → C is cofinal.
+
+section K
+variables (K : Type u) (hK : card K = κ)
+
+section indiscrete
+def indiscrete (α : Type u) : Type u := α
+instance indiscrete.small_category (α : Type u) : small_category (indiscrete α) :=
+{ hom := λ X Y, punit,
+  id := λ X, punit.star,
+  comp := λ X Y Z f g, punit.star }
+end indiscrete
+
+-- TODO
+section set
+variables {α : Type*}
+@[simp] theorem range_subtype_val {p : α → Prop} : range (@subtype.val α p) = set_of p :=
+set.ext $ by simp
+end set
+
+include hK
+lemma CxK_part_I (hC : kappa_filtered κ C) : part_I_condition κ (C × indiscrete K) :=
+assume S hS,
+  let S' := image_subgraph (prod.fst.{u u u u} C (indiscrete K)) S in
+  have S'_small : S'.is_kappa_small κ, from image_small_of_small κ _ _ hS,
+  let ⟨Z, g, h⟩ := ((filtered''_iff_filtered κ).mpr hC).cocone_subgraph S' S'_small in
+  let ks : set K := _root_.prod.snd '' S.objs in
+  have ks ≠ univ, begin
+    intro H, change _root_.prod.snd '' set_of S.objs = univ at H,
+    rw [←range_subtype_val, ←range_comp, range_iff_surjective] at H,
+    apply not_le_of_lt hS.1,
+    convert ge_of_surjective _ H,
+    exact hK.symm
+  end,
+  let ⟨k, _, hk⟩ := exists_of_ssubset ⟨subset_univ ks, this⟩ in
+  let T : subgraph (C × indiscrete K) := _ in
+  -- We need to take S and throw in all the maps to (Z, k) determined by the cocone g.
+  -- Then (Z, k) will be an end of this subgraph.
+  ⟨⟨T, _, ⟨⟨Z, k⟩, _⟩, _⟩, _⟩
+
+end K
+
+end part_II
+
 end directed_from_filtered
 
 end
