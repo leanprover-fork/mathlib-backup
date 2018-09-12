@@ -541,13 +541,6 @@ instance indiscrete.small_category (α : Type u) : small_category (indiscrete α
   comp := λ X Y Z f g, punit.star }
 end indiscrete
 
--- TODO
-section set
-variables {α : Type*}
-@[simp] theorem range_subtype_val {p : α → Prop} : range (@subtype.val α p) = set_of p :=
-set.ext $ by simp
-end set
-
 include hK
 lemma CxK_part_I (hC : kappa_filtered κ C) : part_I_condition κ (C × indiscrete K) :=
 assume S hS,
@@ -557,7 +550,7 @@ assume S hS,
   let ks : set K := _root_.prod.snd '' S.objs in
   have ks ≠ univ, begin
     intro H, change _root_.prod.snd '' set_of S.objs = univ at H,
-    rw [←range_subtype_val, ←range_comp, range_iff_surjective] at H,
+    rw [←subtype_val_range, ←range_comp, range_iff_surjective] at H,
     apply not_le_of_lt hS.1,
     convert ge_of_surjective _ H,
     exact hK.symm
