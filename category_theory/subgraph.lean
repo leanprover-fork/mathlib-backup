@@ -51,6 +51,13 @@ instance : preorder (subgraph C) :=
     intros X Y f hf, exact hTU₂ _ _ (hST₂ _ _ hf)
   end⟩ }
 
+lemma obj_mem_of_mem_of_subgraph {X : C} {S T : subgraph C} (hX : X ∈ S.objs) (h : S ≤ T) : X ∈ T.objs :=
+h.fst hX
+
+lemma hom_mem_of_mem_of_subgraph {S T : subgraph C} {X Y : S.objs} {f : X.1 ⟶ Y.1}
+  (h : S ≤ T) (hf : f ∈ S.homs X Y) : f ∈ T.homs ⟨X.1, h.fst X.2⟩ ⟨Y.1, h.fst Y.2⟩ :=
+by rcases h with ⟨_, hhom⟩; exact hhom _ _ hf
+
 section singleton_subgraph
 variables (c : C)
 

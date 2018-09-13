@@ -303,7 +303,7 @@ open union_index
 instance union_index.fintype : fintype union_index := sorry
 
 include hC
-local attribute [elab_simple] subgraph_union
+local attribute [elab_simple] subgraph_union -- hom_mem_of_mem_of_subgraph
 lemma cofinal_F : cofinal (F κ C) :=
 ⟨begin
    intro c,
@@ -333,16 +333,15 @@ lemma cofinal_F : cofinal (F κ C) :=
    rcases hC U₀ U₀_small with ⟨U, hU⟩,
    refine ⟨U, ⟨⟨_⟩⟩, ⟨⟨_⟩⟩, _⟩,
    -- TODO: Refactor all this reasoning about membership/subgraphs (also in def of F)
+   -- It's still not great.
    { change S.S ≤ U.S, exact le_trans (subgraph_union U_ uS) hU },
    { change T.S ≤ U.S, exact le_trans (subgraph_union U_ uT) hU },
    { have : c ∈ U.S.objs := (le_trans (subgraph_union U_ uf) hU).fst (single_morphism_objs.src f),
      have h1 := U.hZ.comp ⟨c, this⟩ ⟨_, (le_trans (subgraph_union U_ uS) hU).fst S.Z.2⟩ f
-       (by rcases le_trans (subgraph_union U_ uf) hU with ⟨_, hhom⟩;
-           exact hhom _ _ (single_morphism_homs.is_f f)),
+       (hom_mem_of_mem_of_subgraph (le_trans (subgraph_union U_ uf) hU) (single_morphism_homs.is_f f)),
      have h2 := U.hZ.comp ⟨c, this⟩ ⟨_, (le_trans (subgraph_union U_ uT) hU).fst T.Z.2⟩ f'
-       (by rcases le_trans (subgraph_union U_ uf') hU with ⟨_, hhom⟩;
-           exact hhom _ _ (single_morphism_homs.is_f f')),
-     erw [h1, h2] }
+       (hom_mem_of_mem_of_subgraph (le_trans (subgraph_union U_ uf') hU) (single_morphism_homs.is_f f')),
+     erw [h1, h2], }
  end⟩
 
 lemma part_I : nonempty (conclusion κ C) :=
@@ -367,6 +366,17 @@ instance indiscrete.small_category (α : Type u) : small_category (indiscrete α
   comp := λ X Y Z f g, punit.star }
 end indiscrete
 
+inductive t_index (α : Type u) : Type u
+| tS {} : t_index
+| tZ {} : t_index
+| tg {} : α → t_index
+open t_index
+
+lemma t_index_small_of_small {α : Type u} (hα : card α < κ) : card (t_index α) < κ :=
+sorry
+
+local attribute [instance] prop_decidable
+
 include hK
 lemma CxK_part_I (hC : kappa_filtered κ C) : part_I_condition κ (C × indiscrete K) :=
 assume S hS,
@@ -382,10 +392,65 @@ assume S hS,
     exact hK.symm
   end,
   let ⟨k, _, hk⟩ := exists_of_ssubset ⟨subset_univ ks, this⟩ in
-  let T : subgraph (C × indiscrete K) := _ in
-  -- We need to take S and throw in all the maps to (Z, k) determined by the cocone g.
-  -- Then (Z, k) will be an end of this subgraph.
-  ⟨⟨T, _, ⟨⟨Z, k⟩, _⟩, _⟩, _⟩
+  -- We need to take S and throw in all the maps to (Z, k) determined by the cocone g,
+  -- as well as the identity map on (Z, k). Then (Z, k) will be an end of this subgraph.
+  let T_ : t_index S.objs → subgraph (C × indiscrete K) := λ t, match t with
+  | tS := S
+  | tZ := singleton_subgraph (Z, k)
+  | tg X := single_morphism_subgraph ((g ⟨X.1.1, image_subgraph_objs.img_obj _ X⟩, punit.star) : X.1 ⟶ (Z, k))
+  end in
+  let T : subgraph (C × indiscrete K) := union_subgraph T_ in begin
+    refine ⟨⟨T, _, ⟨⟨Z, k⟩, _⟩, ⟨_, _, _, _⟩⟩, _⟩,
+    { apply union_small_of_small, { apply t_index_small_of_small, exact hS.1 },
+      { rintro (_|_|_),
+        { exact hS },
+        { apply singleton_subgraph_is_small },
+        { apply single_morphism_subgraph_is_small } } },
+    { -- TODO
+      apply union_subgraph_objs.mem_obj tZ,
+      apply singleton_objs.is_c },
+    { -- ⊢ Π (X : ↥(T.objs)), X.val ⟶ ⟨(Z, k), _⟩.val
+      -- We need to send (Z, k) to its identity map and other objects to the map (g _, *)
+      -- which we constructed in T_ (tg X).
+      -- We can distinguish (Z, k) as the only object with second component k.
+      exact λ X, if H : X.1.snd = k then begin
+        refine eq_to_iso (show X.1 = (Z, k), from _),
+        cases X.property with i hX; cases i; -- etc.
+        admit
+      end else begin
+        refine (g ⟨X.1.fst, _⟩, punit.star),
+        admit
+      end },
+    { intro X,
+      rcases X with ⟨X, hX⟩, dsimp { iota := tt },
+      rcases hX with ⟨i, _, hX'⟩, -- ? what is happening here
+      rcases i,
+      { have : ¬(X.snd = k), from sorry,
+        simp [dif_neg this],
+        exact hom_mem_of_mem_of_subgraph (subgraph_union T_ (tg ⟨X, hX'⟩))
+          (single_morphism_homs.is_f _) },
+      { rcases hX',
+        simp,
+        exact hom_mem_of_mem_of_subgraph (subgraph_union T_ (tZ))
+          (singleton_homs.is_id_c _) },
+      { -- ugh: the remaining case is redundant.
+        -- X is either the src or tgt of a cocone morphism, so we already handled it above...
+        rcases hX',
+        { have : ¬(i.val.snd = k), from sorry,
+          simp [dif_neg this],
+          exact hom_mem_of_mem_of_subgraph (subgraph_union T_ (tg i))
+            (single_morphism_homs.is_f _) },
+        { simp,
+          exact hom_mem_of_mem_of_subgraph (subgraph_union T_ (tZ))
+            (singleton_homs.is_id_c _) } } },
+    { simp, exact rfl },
+    { intros X Y f hf,
+      rcases hf,
+      rcases hf_i,
+      all_goals { admit } -- TODO
+ },
+    { exact subgraph_union T_ tS }
+  end
 
 end K
 
