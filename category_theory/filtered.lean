@@ -36,7 +36,7 @@ structure kappa_filtered' (C : Type u) [small_category C] : Prop :=
 
 structure kappa_filtered'' (C : Type u) [small_category C] : Prop :=
 (cocone_subgraph : ∀ (S : subgraph C) (h : S.is_kappa_small κ),
-  ∃ (Z : C) (g : Π X : S.objs, X.1 ⟶ Z), ∀ X Y (f : S.homs X Y), f.1 ≫ g Y = g X)
+  ∃ (Z : C) (g : Π X : S.objs, X.1 ⟶ Z), ∀ X Y (f : S.homs X Y), f.1 ≫ g (S.cod f) = g (S.dom f))
 
 variables {C : Type u} [small_category C]
 
@@ -148,8 +148,10 @@ lemma filtered'_implies_filtered'' (h : kappa_filtered' κ C) : kappa_filtered''
   -- If there aren't any morphisms in S, then we have a problem in step 4, but then we can just
   -- use the original cocone Z₀.
   let ⟨⟨Z₀, e⟩⟩ := h.cocone_objs hS₀ (λ X, X) in
-  have ∀ (f : Σ X Y, S.homs X Y), ∃ (p : Σ Z, Z₀ ⟶ Z), e f.1 ≫ p.2 = (f.2.2.val ≫ e f.2.1) ≫ p.2,
-  from assume ⟨X, Y, f⟩, let ⟨Z, h, hh⟩ := h.cone_parallel_two κ (e X) (f.val ≫ e Y) in ⟨⟨Z, h⟩, hh⟩,
+  have ∀ (f : Σ X Y, S.homs X Y), ∃ (p : Σ Z, Z₀ ⟶ Z),
+    e (S.dom f.2.2) ≫ p.2 = (f.2.2.val ≫ e (S.cod f.2.2)) ≫ p.2,
+  from assume ⟨X, Y, f⟩,
+    let ⟨Z, h, hh⟩ := h.cone_parallel_two κ (e (S.dom f)) (f.val ≫ e (S.cod f)) in ⟨⟨Z, h⟩, hh⟩,
   let ⟨g, hg⟩ := axiom_of_choice this,
       ⟨⟨Z₁, j⟩⟩ := h.cocone_objs hS₁ (λ f, (g f).1),
       ⟨Z, k, hk⟩ := h.cocone_parallel (Σ X Y, S.homs X Y) hS₁ (λ f, (g f).2 ≫ j f) in
@@ -158,7 +160,8 @@ lemma filtered'_implies_filtered'' (h : kappa_filtered' κ C) : kappa_filtered''
       let ⟨f₀⟩ := hhom in
       have ∀ f : Σ X Y, S.homs X Y, (g f₀).2 ≫ j f₀ ≫ k = (g f).2 ≫ j f ≫ k,
       from assume f, by simpa using hk f₀ f,
-      ⟨Z, λ X, e X ≫ (g f₀).2 ≫ j f₀ ≫ k, λ X Y f,
+      ⟨Z, λ X, e X ≫ (g f₀).2 ≫ j f₀ ≫ k, λ _ _ f,
+        let X := S.dom f, Y := S.cod f in
         calc f.val ≫ e Y ≫ (g f₀).snd ≫ j f₀ ≫ k
             = f.val ≫ e Y ≫ (g ⟨X, Y, f⟩).snd ≫ j ⟨X, Y, f⟩ ≫ k   : by rw this
         ... = ((f.val ≫ e Y) ≫ (g ⟨X, Y, f⟩).snd) ≫ j ⟨X, Y, f⟩ ≫ k : by simp
@@ -168,10 +171,13 @@ lemma filtered'_implies_filtered'' (h : kappa_filtered' κ C) : kappa_filtered''
     (λ nohoms, ⟨Z₀, λ X, e X, λ X Y f, by refine absurd _ nohoms; exact ⟨⟨X, Y, f⟩⟩⟩) }
 
 lemma filtered''_implies_filtered (h : kappa_filtered'' κ C) : kappa_filtered κ C :=
-{ cocone_functor := assume I catI hI F, by letI := catI; exact
+{ cocone_functor := assume I catI hI F, by exactI
+  -- TODO: image of entire subcategory of I?
   let S : subgraph C :=
         { objs := {X | ∃ i, F i = X},
-          homs := λ X Y, {f | ∃ (ijg : Σ (i j : I), i ⟶ j), F ijg.1 = X ∧ F ijg.2.1 = Y ∧ F.map ijg.2.2 == f} } in
+          homs := λ X Y, {f | ∃ (ijg : Σ (i j : I), i ⟶ j), F ijg.1 = X ∧ F ijg.2.1 = Y ∧ F.map ijg.2.2 == f},
+          dom_mem := sorry,
+          cod_mem := sorry } in
   have hS₀ : card S.objs < κ, begin
     refine lt_of_le_of_lt _ (ob_small_of_small κ hI),
     refine ge_of_surjective (λ i, ⟨F i, i, rfl⟩) _,
@@ -180,13 +186,13 @@ lemma filtered''_implies_filtered (h : kappa_filtered'' κ C) : kappa_filtered �
   have hS₁ : card (Σ X Y, S.homs X Y) < κ, begin
     refine lt_of_le_of_lt _ hI,
     refine ge_of_surjective
-      (λ ijg, ⟨⟨F ijg.1, ijg.1, rfl⟩, ⟨F ijg.2.1, ijg.2.1, rfl⟩, F.map ijg.2.2, ijg, rfl, rfl, heq.rfl⟩) _,
-    rintro ⟨⟨X, _⟩, ⟨Y, _⟩, ⟨f, ijg, ⟨⟩, ⟨⟩, ⟨⟩⟩⟩,
+      (λ ijg, ⟨F ijg.1, F ijg.2.1, F.map ijg.2.2, ijg, rfl, rfl, heq.rfl⟩) _,
+    rintro ⟨X, Y, ⟨f, ijg, ⟨⟩, ⟨⟩, ⟨⟩⟩⟩,
     exact ⟨ijg, rfl⟩
   end,
   let ⟨Z, g, hg⟩ := h.cocone_subgraph S ⟨hS₀, hS₁⟩ in
   ⟨{ X := Z, ι := λ i, g ⟨F i, i, rfl⟩,
-     w := assume i i' f, hg ⟨F i, i, rfl⟩ ⟨F i', i', rfl⟩ ⟨F.map f, ⟨i, i', f⟩, rfl, rfl, heq.rfl⟩ }⟩ }
+     w := assume i i' f, hg (F i) (F i') ⟨F.map f, ⟨i, i', f⟩, rfl, rfl, heq.rfl⟩ }⟩ }
 
 lemma filtered'_iff_filtered : kappa_filtered' κ C ↔ kappa_filtered κ C :=
 ⟨λ h, filtered''_implies_filtered κ (filtered'_implies_filtered'' κ h),
@@ -253,7 +259,8 @@ variables (hC : part_I_condition κ C)
 
 variables {κ C}
 lemma I_kappa_directed {α : Type u} (hα : card α < κ) (f : α → I κ C) : ∃ T, ∀ a, f a ≤ T :=
-let S : subgraph C :=
+-- TODO: Move this proof to image_small_of_small
+/-let S : subgraph C :=
       { objs := ⋃ (a : α), (f a).S.objs,
         homs := λ X Y, ⋃ (a : {a : α // X.1 ∈ (f a).S.objs ∧ Y.1 ∈ (f a).S.objs}),
           (f a.1).S.homs ⟨X, a.2.1⟩ ⟨Y, a.2.2⟩ },
@@ -264,12 +271,11 @@ let S : subgraph C :=
         apply small_of_small_union_of_small,
         { exact lt_of_le_of_lt le_of_subtype hα },
         { rintro ⟨a, aX, aY⟩, apply subgraph.hom_small_of_kappa_small, exact (f a).hS } }
-    end in
-⟨T, assume a, show (f a).S ≤ T.S, begin
-  refine le_trans _ h,
-  refine ⟨subset_Union (λ a, (f a).S.objs) a, _⟩,
-  rintros ⟨_,X₂⟩ ⟨_,Y₂⟩ f hf, simp, exact ⟨a, ⟨X₂, Y₂⟩, hf⟩
- end⟩
+    end in-/
+let S : subgraph C := union_subgraph (λ a, (f a).S),
+    hS : S.is_kappa_small κ := sorry,
+    ⟨T, h⟩ := hC S hS in
+⟨T, assume a, show (f a).S ≤ T.S, by refine le_trans _ h; exact subgraph_union _ a⟩
 
 -- TODO: general equivalence between kappa_directed & kappa_filtered for preorders
 lemma I_kappa_filtered : kappa_filtered κ (I κ C) :=
@@ -280,14 +286,14 @@ lemma I_kappa_filtered : kappa_filtered κ (I κ C) :=
 variables (κ C)
 def F : I κ C ↝ C :=
 { obj := λ S, S.Z,
-  map' := λ S T h, T.hZ.e ⟨S.Z.1, (Exists.fst h.down.down) S.Z.2⟩,
+  map' := λ S T h, T.hZ.e ⟨S.Z.1, h.down.down.1 S.Z.2⟩,
   map_id' := λ S, by convert S.hZ.id; simp,
   map_comp' := λ S T U hST hTU, begin
     symmetry,
     -- TODO: Clean this up
     apply U.hZ.comp
-      ⟨S.Z.1, (Exists.fst (hST ≫ hTU).down.down) S.Z.2⟩
-      ⟨T.Z.1, (Exists.fst hTU.down.down) T.Z.2⟩,
+      ⟨S.Z.1, (hST ≫ hTU).down.down.1 S.Z.2⟩
+      ⟨T.Z.1, hTU.down.down.1 T.Z.2⟩,
     rcases hTU with ⟨⟨⟨h₁, h₂⟩⟩⟩,
     apply h₂,
     apply T.hZ.mem
@@ -296,14 +302,7 @@ def F : I κ C ↝ C :=
 -- Next, we have to prove that F is cofinal.
 variables {C}
 
-inductive union_index : Type u
-| uS | uT | uf | uf'
-open union_index
-
-instance union_index.fintype : fintype union_index := sorry
-
 include hC
-local attribute [elab_simple] subgraph_union -- hom_mem_of_mem_of_subgraph
 lemma cofinal_F : cofinal (F κ C) :=
 ⟨begin
    intro c,
@@ -316,32 +315,24 @@ lemma cofinal_F : cofinal (F κ C) :=
  end,
  begin
    intros c S T f f',
-   let U_ : union_index → subgraph C := λ i, match i with
-   | uS := S.S
-   | uT := T.S
-   | uf := single_morphism_subgraph f
-   | uf' := single_morphism_subgraph f'
-   end,
-   let U₀ := union_subgraph U_,
-   have U_small : ∀ i, (U_ i).is_kappa_small κ := λ i, match i with
-   | uS := S.hS
-   | uT := T.hS
-   | uf := single_morphism_subgraph_is_small κ f
-   | uf' := single_morphism_subgraph_is_small κ f'
-   end,
-   have U₀_small : U₀.is_kappa_small κ := union_small_of_small κ U_ (is_small_of_finite κ) U_small,
+   let U₀ := S.S ∪ T.S ∪ single_morphism_subgraph f ∪ single_morphism_subgraph f',
+   have U₀_small : U₀.is_kappa_small κ := by simp [S.hS, T.hS],
    rcases hC U₀ U₀_small with ⟨U, hU⟩,
+   have SU : S.S ≤ U.S,
+   { refine le_trans _ hU,
+     repeat { apply le_refl <|> refine le_trans _ (subgraph_union_left _ _) } },
+   have TU : T.S ≤ U.S,
+   { refine le_trans _ hU,
+     repeat { apply subgraph_union_right <|> refine le_trans _ (subgraph_union_left _ _) } },
    refine ⟨U, ⟨⟨_⟩⟩, ⟨⟨_⟩⟩, _⟩,
    -- TODO: Refactor all this reasoning about membership/subgraphs (also in def of F)
    -- It's still not great.
-   { change S.S ≤ U.S, exact le_trans (subgraph_union U_ uS) hU },
-   { change T.S ≤ U.S, exact le_trans (subgraph_union U_ uT) hU },
-   { have : c ∈ U.S.objs := (le_trans (subgraph_union U_ uf) hU).fst (single_morphism_objs.src f),
-     have h1 := U.hZ.comp ⟨c, this⟩ ⟨_, (le_trans (subgraph_union U_ uS) hU).fst S.Z.2⟩ f
-       (hom_mem_of_mem_of_subgraph (le_trans (subgraph_union U_ uf) hU) (single_morphism_homs.is_f f)),
-     have h2 := U.hZ.comp ⟨c, this⟩ ⟨_, (le_trans (subgraph_union U_ uT) hU).fst T.Z.2⟩ f'
-       (hom_mem_of_mem_of_subgraph (le_trans (subgraph_union U_ uf') hU) (single_morphism_homs.is_f f')),
-     erw [h1, h2], }
+   { exact SU }, { exact TU },
+   { have : c ∈ U₀ := by simp,
+     have : c ∈ U.S := hU.1 this,
+     have h1 := U.hZ.comp ⟨c, this⟩ ⟨_, SU.1 S.Z.2⟩ f (hU.2 _ _ (by simp)),
+     have h2 := U.hZ.comp ⟨c, this⟩ ⟨_, TU.1 T.Z.2⟩ f' (hU.2 _ _ (by simp)),
+     erw [h1, h2] }
  end⟩
 
 lemma part_I : nonempty (conclusion κ C) :=
@@ -383,7 +374,7 @@ assume S hS,
   let S' := image_subgraph (prod.fst.{u u u u} C (indiscrete K)) S in
   have S'_small : S'.is_kappa_small κ, from image_small_of_small κ _ _ hS,
   let ⟨Z, g, h⟩ := ((filtered''_iff_filtered κ).mpr hC).cocone_subgraph S' S'_small in
-  let ks : set K := _root_.prod.snd '' S.objs in
+  let ks : set (discrete K) := _root_.prod.snd '' S.objs in
   have ks ≠ univ, begin
     intro H, change _root_.prod.snd '' set_of S.objs = univ at H,
     rw [←subtype_val_range, ←range_comp, range_iff_surjective] at H,
@@ -397,9 +388,11 @@ assume S hS,
   let T_ : t_index S.objs → subgraph (C × indiscrete K) := λ t, match t with
   | tS := S
   | tZ := singleton_subgraph (Z, k)
-  | tg X := single_morphism_subgraph ((g ⟨X.1.1, image_subgraph_objs.img_obj _ X⟩, punit.star) : X.1 ⟶ (Z, k))
+  | tg X := single_morphism_subgraph ((g ⟨X.1.1, image_subgraph_objs.img_obj _ X.2⟩, punit.star) : X.1 ⟶ (Z, k))
   end in
-  let T : subgraph (C × indiscrete K) := union_subgraph T_ in begin
+  let T : subgraph (C × indiscrete K) := union_subgraph T_ in
+  have memT : ∀ X, X ∈ T → X ∈ S ∨ X = (Z, k), from sorry,
+  begin
     refine ⟨⟨T, _, ⟨⟨Z, k⟩, _⟩, ⟨_, _, _, _⟩⟩, _⟩,
     { apply union_small_of_small, { apply t_index_small_of_small, exact hS.1 },
       { rintro (_|_|_),
@@ -412,37 +405,22 @@ assume S hS,
     { -- ⊢ Π (X : ↥(T.objs)), X.val ⟶ ⟨(Z, k), _⟩.val
       -- We need to send (Z, k) to its identity map and other objects to the map (g _, *)
       -- which we constructed in T_ (tg X).
-      -- We can distinguish (Z, k) as the only object with second component k.
-      exact λ X, if H : X.1.snd = k then begin
-        refine eq_to_iso (show X.1 = (Z, k), from _),
-        cases X.property with i hX; cases i; -- etc.
-        admit
-      end else begin
-        refine (g ⟨X.1.fst, _⟩, punit.star),
-        admit
-      end },
+      exact λ X,
+        if H : X.1 = (Z, k)
+        then (eq_to_iso H).hom
+        else (g ⟨X.1.fst, image_subgraph_objs.img_obj _ ((memT X.1 X.2).resolve_right H)⟩, punit.star) },
     { intro X,
-      rcases X with ⟨X, hX⟩, dsimp { iota := tt },
-      rcases hX with ⟨i, _, hX'⟩, -- ? what is happening here
-      rcases i,
-      { have : ¬(X.snd = k), from sorry,
-        simp [dif_neg this],
-        exact hom_mem_of_mem_of_subgraph (subgraph_union T_ (tg ⟨X, hX'⟩))
-          (single_morphism_homs.is_f _) },
-      { rcases hX',
-        simp,
-        exact hom_mem_of_mem_of_subgraph (subgraph_union T_ (tZ))
-          (singleton_homs.is_id_c _) },
-      { -- ugh: the remaining case is redundant.
-        -- X is either the src or tgt of a cocone morphism, so we already handled it above...
-        rcases hX',
-        { have : ¬(i.val.snd = k), from sorry,
-          simp [dif_neg this],
-          exact hom_mem_of_mem_of_subgraph (subgraph_union T_ (tg i))
-            (single_morphism_homs.is_f _) },
-        { simp,
-          exact hom_mem_of_mem_of_subgraph (subgraph_union T_ (tZ))
-            (singleton_homs.is_id_c _) } } },
+      rcases memT X.1 X.2 with h₁|h₂,
+      { have : X.val ≠ (Z, k), { -- TODO: Otherwise, k would be in prod.snd '' S
+admit
+ },
+        simp [this], refine hom_mem_of_mem_of_subgraph _ (subgraph_union T_ (tg ⟨X, h₁⟩)),
+        apply mem_single_morphism },
+      { cases X with X₁ X₂,
+        simp [dif_pos h₂],
+        refine hom_mem_of_mem_of_subgraph _ (subgraph_union T_ tZ),
+        cases h₂,
+        apply singleton_homs.is_id_c } },
     { simp, exact rfl },
     { intros X Y f hf,
       rcases hf,
