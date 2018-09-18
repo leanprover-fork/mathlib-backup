@@ -89,6 +89,8 @@ def singleton_subgraph : subgraph C :=
   dom_mem := by rintros _ _ _ ⟨⟩; exact is_c c,
   cod_mem := by rintros _ _ _ ⟨⟩; exact is_c c }
 
+@[simp] lemma obj_mem_singleton_subgraph : c ∈ singleton_subgraph c := sorry
+
 lemma singleton_subgraph_is_small : (singleton_subgraph c).is_kappa_small κ := sorry
 
 end singleton_subgraph
@@ -127,13 +129,9 @@ instance : has_union (subgraph C) :=
    dom_mem := λ X Y f hf, begin cases hf, exact or.inl (S.dom_mem hf), exact or.inr (T.dom_mem hf) end,
    cod_mem := λ X Y f hf, begin cases hf, exact or.inl (S.cod_mem hf), exact or.inr (T.cod_mem hf) end }⟩
 
-#check @set.mem_union_eq
-
 @[simp] lemma obj_mem_union_eq (X : C) (S T : subgraph C) : X ∈ S ∪ T = (X ∈ S ∨ X ∈ T) := rfl
 @[simp] lemma hom_mem_union_eq {X Y : C} (f : X ⟶ Y) (S T : subgraph C) :
   f ∈ (S ∪ T).homs X Y = (f ∈ S.homs X Y ∨ f ∈ T.homs X Y) := rfl
-
-#check set.subset_union_left
 
 @[simp] lemma subgraph_union_left (S T : subgraph C) : S ⊆ S ∪ T := sorry
 @[simp] lemma subgraph_union_right (S T : subgraph C) : T ⊆ S ∪ T := sorry

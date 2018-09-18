@@ -346,6 +346,70 @@ section part_II
 -- indiscrete category, then C × K has the property required for
 -- part_I and the functor C × K → C is cofinal.
 
+-- First we show that if C is "freshly filtered" in that we can choose
+-- a cocone on any κ-small subgraph S with a vertex not belonging to
+-- S, then C satisfies the part_I property.
+
+structure freshly_filtered (C : Type u) [small_category C] : Prop :=
+(cocone_subgraph : ∀ (S : subgraph C) (h : S.is_kappa_small κ),
+  ∃ (Z : C) (g : Π X : S.objs, X.1 ⟶ Z), Z ∉ S.objs ∧
+    ∀ X Y (f : S.homs X Y), f.1 ≫ g (S.cod f) = g (S.dom f))
+
+local attribute [instance] prop_decidable
+
+lemma part_I_of_freshly_filtered (hC : freshly_filtered κ C) : part_I_condition κ C :=
+assume S hS,
+  let ⟨Z, g, hZ, h⟩ := hC.cocone_subgraph S hS in
+  let T : subgraph C :=
+    S ∪ singleton_subgraph Z ∪ union_subgraph (λ (X : S.objs), single_morphism_subgraph (g X)) in
+  have memT : ∀ {X}, X ∈ T → X ∈ S ∨ X = Z, begin
+    intros X hX,
+    rcases hX with hX₁|hX₂,
+    { rcases hX₁ with hX₁|⟨⟨⟩⟩, { exact or.inl hX₁ }, { exact or.inr rfl } },
+    { rcases hX₂ with ⟨i, _, _, _, ⟨⟨⟩⟩⟩,
+      { exact or.inl i.2 },
+      { exact or.inr rfl } }
+  end,
+  have memS : ∀ {X}, X ∈ S → X ≠ Z, from assume X hS hX, by rw hX at hS; exact absurd hS hZ,
+  let g' : Π X : T.objs, X.1 ⟶ Z := λ X,
+    if H : X.1 = Z
+    then (eq_to_iso H).hom
+    else g ⟨X.1, (memT X.2).resolve_right H⟩ in
+  begin
+    refine ⟨⟨T, _, ⟨Z, _⟩, ⟨g', _, _, _⟩⟩, _⟩,
+    -- TODO: Can we make simp kill this entire smallness subgoal?
+    { apply union_small_of_small_of_small,
+      { exact union_small_of_small_of_small κ hS (singleton_subgraph_is_small _ _) },
+      { apply union_small_of_small κ _ hS.1, intro i,
+        apply single_morphism_subgraph_is_small } },
+    { change Z ∈ T, simp [T] },
+    { dsimp [g'], intro X,
+      rcases memT X.2 with h₁|h₂,
+      { have : X.1 ≠ Z, from memS h₁,
+        simp [this], refine hom_mem_of_mem_of_subgraph _ (subgraph_union_right _ _),
+        refine hom_mem_of_mem_of_subgraph _ (subgraph_union _ ⟨X.1, h₁⟩),
+        apply mem_single_morphism },
+      { cases X with X₁ X₂,
+        simp [dif_pos h₂],
+        refine hom_mem_of_mem_of_subgraph _ (subgraph_union_left _ _),
+        refine hom_mem_of_mem_of_subgraph _ (subgraph_union_right _ _),
+        cases h₂,
+        exact singleton_homs.is_id_c Z } },
+      { simp [g'], refl },
+      { intros X Y f hf,
+        rcases hf with hf|hf₃,
+        { rcases hf with hf₁|hf₂,
+          { have XZ : X.1 ≠ Z, from memS (S.dom_mem hf₁),
+            have YZ : Y.1 ≠ Z, from memS (S.cod_mem hf₁),
+            simp [g', dif_neg, XZ, YZ], exact h X.1 Y.1 ⟨f, hf₁⟩ },
+          { cases X, cases Y, cases hf₂, simp } },
+        { cases X, cases Y, rcases hf₃ with ⟨i, _, _, _, ⟨⟩⟩,
+          have iZ : i.1 ≠ Z, from memS i.2,
+          cases i, simp [g', dif_neg iZ], refl } },
+      { exact le_trans (subgraph_union_left _ _) (subgraph_union_left _ _) }
+  end
+
+
 section K
 variables (K : Type u) (hK : card K = κ)
 
@@ -357,20 +421,11 @@ instance indiscrete.small_category (α : Type u) : small_category (indiscrete α
   comp := λ X Y Z f g, punit.star }
 end indiscrete
 
-inductive t_index (α : Type u) : Type u
-| tS {} : t_index
-| tZ {} : t_index
-| tg {} : α → t_index
-open t_index
-
-lemma t_index_small_of_small {α : Type u} (hα : card α < κ) : card (t_index α) < κ :=
-sorry
-
-local attribute [instance] prop_decidable
-
+-- Then we show that if C is κ-filtered and K is a set of cardinality
+-- κ then C × K is freshly filtered.
 include hK
-lemma CxK_part_I (hC : kappa_filtered κ C) : part_I_condition κ (C × indiscrete K) :=
-assume S hS,
+lemma CxK_part_I' (hC : kappa_filtered κ C) : freshly_filtered κ (C × indiscrete K) :=
+{ cocone_subgraph := assume S hS,
   let S' := image_subgraph (prod.fst.{u u u u} C (indiscrete K)) S in
   have S'_small : S'.is_kappa_small κ, from image_small_of_small κ _ _ hS,
   let ⟨Z, g, h⟩ := ((filtered''_iff_filtered κ).mpr hC).cocone_subgraph S' S'_small in
@@ -383,54 +438,25 @@ assume S hS,
     exact hK.symm
   end,
   let ⟨k, _, hk⟩ := exists_of_ssubset ⟨subset_univ ks, this⟩ in
-  -- We need to take S and throw in all the maps to (Z, k) determined by the cocone g,
-  -- as well as the identity map on (Z, k). Then (Z, k) will be an end of this subgraph.
-  let T_ : t_index S.objs → subgraph (C × indiscrete K) := λ t, match t with
-  | tS := S
-  | tZ := singleton_subgraph (Z, k)
-  | tg X := single_morphism_subgraph ((g ⟨X.1.1, image_subgraph_objs.img_obj _ X.2⟩, punit.star) : X.1 ⟶ (Z, k))
-  end in
-  let T : subgraph (C × indiscrete K) := union_subgraph T_ in
-  have memT : ∀ X, X ∈ T → X ∈ S ∨ X = (Z, k), from sorry,
-  begin
-    refine ⟨⟨T, _, ⟨⟨Z, k⟩, _⟩, ⟨_, _, _, _⟩⟩, _⟩,
-    { apply union_small_of_small, { apply t_index_small_of_small, exact hS.1 },
-      { rintro (_|_|_),
-        { exact hS },
-        { apply singleton_subgraph_is_small },
-        { apply single_morphism_subgraph_is_small } } },
-    { -- TODO
-      apply union_subgraph_objs.mem_obj tZ,
-      apply singleton_objs.is_c },
-    { -- ⊢ Π (X : ↥(T.objs)), X.val ⟶ ⟨(Z, k), _⟩.val
-      -- We need to send (Z, k) to its identity map and other objects to the map (g _, *)
-      -- which we constructed in T_ (tg X).
-      exact λ X,
-        if H : X.1 = (Z, k)
-        then (eq_to_iso H).hom
-        else (g ⟨X.1.fst, image_subgraph_objs.img_obj _ ((memT X.1 X.2).resolve_right H)⟩, punit.star) },
-    { intro X,
-      rcases memT X.1 X.2 with h₁|h₂,
-      { have : X.val ≠ (Z, k), { -- TODO: Otherwise, k would be in prod.snd '' S
-admit
- },
-        simp [this], refine hom_mem_of_mem_of_subgraph _ (subgraph_union T_ (tg ⟨X, h₁⟩)),
-        apply mem_single_morphism },
-      { cases X with X₁ X₂,
-        simp [dif_pos h₂],
-        refine hom_mem_of_mem_of_subgraph _ (subgraph_union T_ tZ),
-        cases h₂,
-        apply singleton_homs.is_id_c } },
-    { simp, exact rfl },
-    { intros X Y f hf,
-      rcases hf,
-      rcases hf_i,
-      all_goals { admit } -- TODO
- },
-    { exact subgraph_union T_ tS }
-  end
+  let Z' : C × indiscrete K := ⟨Z, k⟩ in
+  have Z' ∉ S, from assume h, by refine absurd _ hk; exact ⟨Z', h, rfl⟩,
+  ⟨Z', λ X, (g ⟨X.1.1, image_subgraph_objs.img_obj _ X.2⟩, punit.star), this, begin
+     intros X Y f,
+     apply prod.ext,
+     { exact h X.1 Y.1 ⟨f.1.1, image_subgraph_homs.img_hom _ f.2⟩ },
+     { apply subsingleton.elim }
+   end⟩ }
+omit hK
+
+lemma CxK_part_I'' (hC : kappa_filtered κ C) : part_I_condition κ (C × indiscrete K) :=
+part_I_of_freshly_filtered κ _ (CxK_part_I' κ C K hK hC)
+
+lemma part_II (hC : kappa_filtered κ C) : nonempty (conclusion κ (C × indiscrete K)) :=
+part_I κ (CxK_part_I'' κ C K hK hC)
 
 end K
+
+-- Remaining: check the projection C × indiscrete K → C is cofinal and then conclude
 
 end part_II
 
