@@ -276,7 +276,7 @@ begin
   have := pow_dvd_pow a' n0,
   rw [pow_one, (co.pow n n).eq_one_of_dvd h] at this,
   simp [eq_one_of_dvd_one this]
-end.
+end
 
 @[simp] theorem coprime_zero_left (n : ℕ) : coprime 0 n ↔ n = 1 := 
 by simp [coprime]
