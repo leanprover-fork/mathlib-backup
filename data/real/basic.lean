@@ -204,7 +204,9 @@ int.exists_greatest_of_bdd
 theorem exists_sup (S : set ℝ) : (∃ x, x ∈ S) → (∃ x, ∀ y ∈ S, y ≤ x) →
   ∃ x, ∀ y, x ≤ y ↔ ∀ z ∈ S, z ≤ y
 | ⟨L, hL⟩ ⟨U, hU⟩ := begin
-  have,
+  have : ∀ (d : ℕ), ∃ (ub : ℤ),
+    (∃ (y : ℝ) (H : y ∈ S), ↑ub ≤ y * ↑d) ∧
+      ∀ (z : ℤ), (∃ (y : ℝ) (H : y ∈ S), ↑z ≤ y * ↑d) → z ≤ ub,
   { refine λ d : ℕ, @int.exists_greatest_of_bdd
       (λ n, ∃ y ∈ S, (n:ℝ) ≤ y * d) _ _ _,
     { cases exists_int_gt U with k hk,
