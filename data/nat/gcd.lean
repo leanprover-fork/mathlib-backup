@@ -276,6 +276,21 @@ begin
   have := pow_dvd_pow a' n0,
   rw [pow_one, (co.pow n n).eq_one_of_dvd h] at this,
   simp [eq_one_of_dvd_one this]
-end
+end.
+
+@[simp] theorem coprime_zero_left (n : ℕ) : coprime 0 n ↔ n = 1 := 
+by simp [coprime]
+
+@[simp] theorem coprime_zero_right (n : ℕ) : coprime n 0 ↔ n = 1 :=
+by simp [coprime]
+
+@[simp] theorem coprime_one_left_iff (n : ℕ) : coprime 1 n ↔ true := 
+by simp [coprime]
+
+@[simp] theorem coprime_one_right_iff (n : ℕ) : coprime n 1 ↔ true :=
+by simp [coprime]
+
+@[simp] theorem coprime_self (n : ℕ) : coprime n n ↔ n = 1 :=
+by simp [coprime]
 
 end nat
