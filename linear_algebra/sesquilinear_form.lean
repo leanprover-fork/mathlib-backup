@@ -1,4 +1,4 @@
-import algebra.module ring_involution
+import algebra.module ring_theory.ring_hom_isom_invo
 
 open module ring ring_invo
 
