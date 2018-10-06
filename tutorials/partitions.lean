@@ -140,19 +140,18 @@ Then the desired existence statement is not hard to prove after using `disjoint_
 has been slightly condensed ("golfed") into term mode, though more explicit type ascriptions are
 provided to help with readability. -/
 def partition_of_disjoint_union {P : finset (finset α)} (h₁ : ∅ ∉ P)
-(h₂ : (multiset.join (P.val.map (λ S, S.val))).to_finset = univ)
+(h₂ : P.sup id = univ)
 (h₃ : ∀ (b₁ b₂), b₁ ∈ P → b₂ ∈ P → b₁ ≠ b₂ → disjoint b₁ b₂) : partition α :=
 by simp [ext] at h₂;
 exact { blocks := P,
   blocks_nonempty := h₁,
   blocks_partition := assume (a : α),
-    by replace h₂ : ∃ b'', (∃ (b : finset α), b ∈ P.val ∧ b.val = b'') ∧ a ∈ b'' := h₂ a;
-    exact exists.elim h₂ (assume (b'' : multiset α)
-      (hb'' : (∃ b : finset α, b ∈ P.val ∧ b.val = b'') ∧ a ∈ b''),
-      exists.elim hb''.1 $ assume (b : finset α) (hb : b ∈ P.val ∧ b.val = b''),
-        have hab : a ∈ b := hb.2.substr hb''.2,
-        exists.intro b ⟨hb.1, hab, assume (b' : finset α) (hb' : b' ∈ P) (hbb' : b ≠ b'),
-          by replace h₃ : disjoint b b' := h₃ b b' hb.1 hb' hbb';
+    by replace h₂ : ∃ b, b ∈ P ∧ a ∈ b := h₂ a;
+    exact exists.elim h₂ (assume (b : finset α)
+      (hb : b ∈ P ∧ a ∈ b),
+      and.elim hb $ assume (hb : b ∈ P) (hab : a ∈ b),
+        exists.intro b ⟨hb,hab,assume (b' : finset α) (hb' : b' ∈ P) (hbb' : b ≠ b'),
+          by replace h₃ : disjoint b b' := h₃ b b' hb hb' hbb';
           exact disjoint_left.mp h₃ hab⟩) }
 
 namespace partition
@@ -179,8 +178,9 @@ ext.2
 /- This definition tells us when a finset of finsets is actually a partition. It uses the second
 (disjoint union) definition of partitions. -/
 def is_partition (P : finset (finset α)) : Prop :=
-∅ ∉ P ∧ (multiset.join (P.val.map (λ S, S.val))).to_finset = univ ∧ ∀ (b₁ b₂), b₁ ∈ P → b₂ ∈ P →
-b₁ ≠ b₂ → disjoint b₁ b₂
+∅ ∉ P ∧ P.sup id = univ ∧
+∀ b₁∈ P, ∀ b₂ ∈ P,
+  b₁ ≠ b₂ → disjoint b₁ b₂
 
 /- This instance now allows us to use #eval to figure out whether a finset is a partition of the
 underlying fintype or not -/
@@ -196,7 +196,7 @@ the fintype corresponding to the set {0, 1, …, n-1}. -/
 
 /- This convenience function lets us create a partition from `is_partition` -/
 def of_is_partition {P : finset (finset α)} (h : is_partition P) : (partition α) :=
-partition_of_disjoint_union h.1 h.2.1 h.2.2
+partition_of_disjoint_union h.1 h.2.1 (λ x₀ x₁ h₀ h₁, h.2.2 _ h₀ _ h₁)
 
 /- `dec_trivial` is the way to use the computation of a decidable proposition as a proof; it is
 useful but limited to evaluations that can be completed within a short timeout. We use it to define
@@ -225,21 +225,89 @@ def partitions : finset (finset (finset α)) :=
 #eval partitions (fin 3)
 -- {{{0, 1, 2}}, {{0, 1}, {2}}, {{0, 2}, {1}}, {{0}, {1, 2}}, {{0}, {1}, {2}}}
 
-theorem card_partitions_eq_card_partitions_fin {n : ℕ} (h : card α = n) :
+lemma mem_partitions (x : finset (finset α)) : x ∈ partitions α ↔ is_partition x :=
+by { simp [partitions], apply and_iff_right_of_imp, simp only [is_partition],
+     rintro ⟨h₀,h₁,h₂⟩,
+     rw subset_iff, intros, simp only [finset.mem_powerset], apply subset_univ, }
+
+variables {α} {β : Type*} [decidable_eq β] [fintype β]
+
+@[simp]
+lemma to_set_filter {s : finset α} (p : α → Prop) [decidable_pred p] :
+  to_set (s.filter p) = to_set s ∩ p :=
+by ext; simp only [to_set,finset.mem_filter]; refl
+
+@[simp] lemma to_set_subset_to_set {s t : finset α} :
+  to_set s ⊆ to_set t ↔ s ⊆ t :=
+by refl
+
+@[simp] lemma powerset_univ :
+  powerset (@univ α _) = univ :=
+by ext; simp only [subset_univ,finset.mem_powerset,finset.mem_univ]
+
+@[simp] lemma to_set_univ :
+  to_set (@univ α _) = set.univ :=
+by ext; simp only [to_set,finset.mem_univ,set.mem_univ,set.mem_set_of_eq]
+
+def coe_equiv_of_iff {s : set α} {t : set β}
+  (h : α ≃ β) (h' : ∀ x, x ∈ s ↔ h x ∈ t) :
+  s ≃ t :=
+{ to_fun := λ ⟨x,hx⟩, ⟨h x,(h' _).1 hx ⟩,
+  inv_fun := λ ⟨x,hx⟩, ⟨h.symm x, (h' _).2 $ by simpa only [equiv.apply_inverse_apply]⟩,
+  left_inv := by { rintro ⟨x,hx⟩, simp! only [equiv.inverse_apply_apply] },
+  right_inv := by { rintro ⟨x,hx⟩, simp! }, }
+
+def finset_equiv (h : α ≃ β) : finset α ≃ finset β :=
+{ to_fun := finset.map h.to_embedding,
+  inv_fun := finset.map h.symm.to_embedding,
+  left_inv := by { intro, simp [finset.map_map,finset.map_refl] },
+  right_inv := by { intro, simp [finset.map_map,finset.map_refl] } }
+
+def partitions_congr (h : α ≃ β) :
+  to_set (partitions α) ≃ to_set (partitions β) :=
+begin
+  simp [partitions,set.mem_powerset_iff],
+  let f : finset (finset α) ≃ finset (finset β) := finset_equiv (finset_equiv h),
+  apply coe_equiv_of_iff f,
+  intros, dsimp [(∈)], simp only [set.mem,is_partition],
+  apply and_congr,
+  { dsimp [f,finset_equiv],
+    simp only [equiv.coe_fn_mk,exists_prop,exists_eq_right,finset.mem_map,
+               equiv.to_embedding_coe_fn,finset.map_eq_empty] },
+  apply and_congr,
+  { dsimp [f,finset_equiv],
+    simp only [finset.sup_map,equiv.to_embedding_coe_fn,
+               equiv.coe_fn_mk,function.comp.left_id],
+    rw [sup_hom' (map _),map_eq_iff_of_equiv],
+    simp only [map_univ], apply_instance },
+  { dsimp [f,finset_equiv,mem_map], simp [disjoint_iff],
+    split; introv h₀ h₁ h₂ h₃,
+    { intros h₄ h₅,
+      subst b₁, subst b₂,
+      specialize h₀ _ h₁ _ h₃ _,
+      { rw [← map_inter,h₀], exact map_empty _ },
+      intro h, subst h, contradiction, },
+    { specialize h₀ _ _ h₁ rfl _ _ h₂ rfl _,
+      { rw [← map_inter,map_eq_iff_of_equiv] at h₀, rw h₀,
+        exact map_empty _ },
+      intro h, apply h₃ (map_inj _ h) } }
+end
+
+theorem card_partitions_eq_card_partitions_fin {n : ℕ} (h : fintype.card α = n) :
 card (partitions α) = card (partitions (fin n)) :=
 begin
   rw ←h,
-  have hcard := (equiv_fin α),
-  sorry
+  refine trunc.induction_on (fintype.equiv_fin α) _, intro this,
+  apply card_eq_of_equiv,
+  apply partitions_congr,
+  apply this,
 end
-
-variable {α}
 
 theorem card_partitions_3 : card (partitions (fin 3)) = 5 :=
 dec_trivial
 
-theorem card_partitions_eq_5_of_card_3 (h : card α = 3) : card (partitions α) = 5 :=
-(card_partitions_eq_card_partitions_fin α h).symm ▸ card_partitions_3
+theorem card_partitions_eq_5_of_card_3 (h : fintype.card α = 3) : card (partitions α) = 5 :=
+(card_partitions_eq_card_partitions_fin h).symm ▸ card_partitions_3
 
 /- We now begin to define a partial order structure on the type `partition α`. We do this by
 imitating the partial order structure on finset given by the subset relation.

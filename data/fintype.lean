@@ -38,6 +38,10 @@ theorem subset_univ (s : finset α) : s ⊆ univ := λ a _, mem_univ a
 theorem eq_univ_iff_forall {s : finset α} : s = univ ↔ ∀ x, x ∈ s :=
 by simp [ext]
 
+lemma map_univ [fintype β] {f : α ≃ β} : map f.to_embedding univ = univ :=
+by ext; rw mem_map; split; simp_intros only [finset.mem_univ,exists_prop_of_true];
+   existsi f.symm a; simp only [equiv.to_embedding_coe_fn,equiv.apply_inverse_apply]
+
 end finset
 
 open finset function

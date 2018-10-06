@@ -46,8 +46,16 @@ theorem inj' {α β} : ∀ (f : α ↪ β), injective f
 
 @[simp] theorem refl_apply {α} (x : α) : embedding.refl α x = x := rfl
 
+@[simp] theorem refl_to_embedding {α : Sort u}  :
+  equiv.to_embedding (_root_.equiv.refl α) = embedding.refl α :=
+rfl
+
 @[simp] theorem trans_apply {α β γ} (f : α ↪ β) (g : β ↪ γ) (a : α) :
   (f.trans g) a = g (f a) := rfl
+
+@[simp] theorem trans_to_embedding {α : Sort u} {β : Sort v} {γ : Sort w} (f : α ≃ β) (g : β ≃ γ) :
+  embedding.trans f.to_embedding g.to_embedding = equiv.to_embedding (f.trans g) :=
+by cases f; cases g; refl
 
 protected def congr {α : Sort u} {β : Sort v} {γ : Sort w} {δ : Sort x}
   (e₁ : α ≃ β) (e₂ : γ ≃ δ) (f : α ↪ γ) : (β ↪ δ) :=
