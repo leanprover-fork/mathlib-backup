@@ -579,6 +579,13 @@ protected noncomputable def range {α β} (f : α → β) (H : injective f) :
 by dunfold equiv.set.range equiv.set.univ;
    simp [set_coe_cast, -image_univ, image_univ.symm]
 
+def coe_equiv_of_iff {α β} {s : set α} {t : set β} (h : α ≃ β) (h' : ∀ x, x ∈ s ↔ h x ∈ t) :
+  s ≃ t :=
+{ to_fun := λ ⟨x,hx⟩, ⟨h x, (h' _).1 hx ⟩,
+  inv_fun := λ ⟨x,hx⟩, ⟨h.symm x, (h' _).2 $ by simpa only [equiv.apply_inverse_apply]⟩,
+  left_inv := by { rintro ⟨x,hx⟩, simp! only [equiv.inverse_apply_apply] },
+  right_inv := by { rintro ⟨x,hx⟩, simp! } }
+
 end set
 
 noncomputable def of_bijective {α β} {f : α → β} (hf : bijective f) : α ≃ β :=
