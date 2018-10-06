@@ -42,6 +42,9 @@ lemma map_univ [fintype β] {f : α ≃ β} : map f.to_embedding univ = univ :=
 by ext; rw mem_map; split; simp_intros only [finset.mem_univ,exists_prop_of_true];
    existsi f.symm a; simp only [equiv.to_embedding_coe_fn,equiv.apply_inverse_apply]
 
+@[simp] lemma to_set_univ : to_set (@univ α _) = set.univ :=
+by ext; simp only [to_set,finset.mem_univ,set.mem_univ,set.mem_set_of_eq]
+
 end finset
 
 open finset function
@@ -397,6 +400,9 @@ fintype.of_surjective quotient.mk (λ x, quotient.induction_on x (λ x, ⟨x, rf
 
 instance finset.fintype [fintype α] : fintype (finset α) :=
 ⟨univ.powerset, λ x, finset.mem_powerset.2 (finset.subset_univ _)⟩
+
+@[simp] lemma fintype.powerset_univ [fintype α] : powerset (@univ α _) = univ :=
+by ext; simp only [subset_univ,finset.mem_powerset,finset.mem_univ]
 
 instance subtype.fintype [fintype α] (p : α → Prop) [decidable_pred p] : fintype {x // p x} :=
 set_fintype _

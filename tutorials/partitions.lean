@@ -167,7 +167,7 @@ follows in Lean because of "proof irrelevance" for terms of type Prop. -/
 by simp
 
 /- This is a version of extensionality for partitions; two partitions P₁ P₂ are equal if and only if
-a finset b is a block of P₁ iff it is a block of P₂. -/
+(a finset b is a block of P₁ iff it is a block of P₂.) -/
 theorem ext {P₁ P₂ : partition α} : P₁ = P₂ ↔ ∀ b, b ∈ P₁.1 ↔ b ∈ P₂.1 :=
 by simp only [eq_of_blocks_eq, ext]
 
@@ -200,8 +200,8 @@ partition_of_disjoint_union h.1 h.2.1 h.2.2
 
 /- We have been using #eval to determine the truth values of decidable propositions. The term
 `dec_trivial` allows us to use computation (in the kernel) as a proof; it is useful, but limited
-to computations that can be completed within a short timeout. We use it to define
-a few explicit partitions of `fin 4` that we will use as running examples. -/
+to computations that can be completed before the short timeout. We use it to define a few explicit
+partitions of `fin 4` that we will use as running examples. -/
 def P0 : partition (fin 4) :=
 of_is_partition (dec_trivial : is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 4))))
 
@@ -226,6 +226,9 @@ def partitions : finset (finset (finset α)) :=
 -- {{{0, 1, 2}}, {{0, 1}, {2}}, {{0, 2}, {1}}, {{0}, {1, 2}}, {{0}, {1}, {2}}}
 /- Unfortunately, computing the partitions of fin 4 causes a timeout with this naive definition. -/
 
+lemma mem_partitions (x : finset (finset α)) : x ∈ partitions α ↔ is_partition x :=
+by simp [partitions]
+
 /- The goal of the next few theorems is to prove the following inocuous looking statement:
 
 The number of partitions of a set of size `n` is equal to the number of partitions of the set
@@ -242,62 +245,29 @@ An additional wrinkle is the fact that we will not have an explicit bijection, b
 existence of one. We will apply a trick using one of lean's quotient axioms (akin to the use of the
 axiom of choice). -/
 
-lemma mem_partitions (x : finset (finset α)) : x ∈ partitions α ↔ is_partition x :=
-by { simp [partitions], apply and_iff_right_of_imp, simp only [is_partition],
-     rintro ⟨h₀,h₁,h₂⟩,
-     rw subset_iff, intros, simp only [finset.mem_powerset], apply subset_univ, }
-
 variables {α} {β : Type*} [decidable_eq β] [fintype β]
 
-@[simp]
-lemma to_set_filter {s : finset α} (p : α → Prop) [decidable_pred p] :
-  to_set (s.filter p) = to_set s ∩ p :=
-by ext; simp only [to_set,finset.mem_filter]; refl
-
-@[simp] lemma to_set_subset_to_set {s t : finset α} :
-  to_set s ⊆ to_set t ↔ s ⊆ t :=
-by refl
-
-@[simp] lemma powerset_univ :
-  powerset (@univ α _) = univ :=
-by ext; simp only [subset_univ,finset.mem_powerset,finset.mem_univ]
-
-@[simp] lemma to_set_univ :
-  to_set (@univ α _) = set.univ :=
-by ext; simp only [to_set,finset.mem_univ,set.mem_univ,set.mem_set_of_eq]
-
-def coe_equiv_of_iff {s : set α} {t : set β}
-  (h : α ≃ β) (h' : ∀ x, x ∈ s ↔ h x ∈ t) :
-  s ≃ t :=
-{ to_fun := λ ⟨x,hx⟩, ⟨h x,(h' _).1 hx ⟩,
-  inv_fun := λ ⟨x,hx⟩, ⟨h.symm x, (h' _).2 $ by simpa only [equiv.apply_inverse_apply]⟩,
-  left_inv := by { rintro ⟨x,hx⟩, simp! only [equiv.inverse_apply_apply] },
-  right_inv := by { rintro ⟨x,hx⟩, simp! }, }
-
-def finset_equiv (h : α ≃ β) : finset α ≃ finset β :=
-{ to_fun := finset.map h.to_embedding,
-  inv_fun := finset.map h.symm.to_embedding,
-  left_inv := by { intro, simp [finset.map_map,finset.map_refl] },
-  right_inv := by { intro, simp [finset.map_map,finset.map_refl] } }
+open equiv
 
 def partitions_congr (h : α ≃ β) :
   to_set (partitions α) ≃ to_set (partitions β) :=
 begin
   simp [partitions,set.mem_powerset_iff],
-  let f : finset (finset α) ≃ finset (finset β) := finset_equiv (finset_equiv h),
-  apply coe_equiv_of_iff f,
+  let f : finset (finset α) ≃ finset (finset β) := finset_equiv_of_equiv
+    (finset_equiv_of_equiv h),
+  apply set.coe_equiv_of_iff f,
   intros, dsimp [(∈)], simp only [set.mem,is_partition],
   apply and_congr,
-  { dsimp [f,finset_equiv],
-    simp only [equiv.coe_fn_mk,exists_prop,exists_eq_right,finset.mem_map,
-               equiv.to_embedding_coe_fn,finset.map_eq_empty] },
+  { dsimp [f,finset_equiv_of_equiv],
+    simp only [coe_fn_mk,exists_prop,exists_eq_right,mem_map,
+               to_embedding_coe_fn,map_eq_empty] },
   apply and_congr,
-  { dsimp [f,finset_equiv],
-    simp only [finset.sup_map,equiv.to_embedding_coe_fn,
-               equiv.coe_fn_mk,function.comp.left_id],
+  { dsimp [f,finset_equiv_of_equiv],
+    simp only [sup_map,to_embedding_coe_fn,
+               coe_fn_mk,function.comp.left_id],
     rw [sup_hom' (map _),map_eq_iff_of_equiv],
     simp only [map_univ], apply_instance },
-  { dsimp [f,finset_equiv,mem_map], simp [disjoint_iff],
+  { dsimp [f,finset_equiv_of_equiv,mem_map], simp [disjoint_iff],
     split; introv h₀ h₁ h₂ h₃,
     { intros h₄ h₅,
       subst b₁, subst b₂,

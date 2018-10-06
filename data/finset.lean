@@ -110,6 +110,9 @@ le_antisymm_iff
 show (↑s₁ : set α) ⊂ ↑s₂ ↔ s₁ ⊆ s₂ ∧ ¬s₂ ⊆ s₁,
   by simp only [set.ssubset_iff_subset_not_subset, finset.coe_subset]
 
+@[simp] lemma to_set_subset_to_set {s t : finset α} : to_set s ⊆ to_set t ↔ s ⊆ t :=
+by refl
+
 @[simp] theorem val_lt_iff {s₁ s₂ : finset α} : s₁.1 < s₂.1 ↔ s₁ ⊂ s₂ :=
 and_congr val_le_iff $ not_congr val_le_iff
 
@@ -595,6 +598,9 @@ by simp only [filter_not, inter_sdiff_self]
 
 @[simp] lemma coe_filter (s : finset α) : ↑(s.filter p) = ({x ∈ ↑s | p x} : set α) :=
 set.ext $ λ _, mem_filter
+
+@[simp] lemma to_set_filter {s : finset α} : to_set (s.filter p) = to_set s ∩ p :=
+by ext; simp only [to_set,finset.mem_filter]; refl
 
 end filter
 
@@ -1594,3 +1600,13 @@ theorem to_finset_card_of_nodup {l : list α} (h : l.nodup) : l.to_finset.card =
 congr_arg card $ (@multiset.erase_dup_eq_self α _ l).2 h
 
 end list
+
+namespace equiv
+
+def finset_equiv_of_equiv {α β} (h : α ≃ β) : finset α ≃ finset β :=
+{ to_fun := finset.map h.to_embedding,
+  inv_fun := finset.map h.symm.to_embedding,
+  left_inv := by { intro, simp [finset.map_map,finset.map_refl] },
+  right_inv := by { intro, simp [finset.map_map,finset.map_refl] } }
+
+end equiv
