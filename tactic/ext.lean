@@ -165,6 +165,8 @@ do subject ← target >>= get_ext_subject,
    m ← extensional_attribute.get_cache,
    do { rule ← m.find subject,
         applyc rule cfg } <|>
+     do { ls ← attribute.get_instances `extensionality,
+          ls.any_of (λ n, applyc n cfg) } <|>
      fail format!"no applicable extensionality rule found for {subject}",
    try_intros xs
 

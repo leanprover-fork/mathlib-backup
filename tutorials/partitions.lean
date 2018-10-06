@@ -49,7 +49,8 @@ stand-in for the underlying finite set of our partition. -/
 
 variable (α)
 
-/- The following definition of a partition is based on the one in wikipedia: https://en.wikipedia.org/wiki/Partition_of_a_set#Definition,
+/- The following definition of a partition is based on the one in wikipedia:
+https://en.wikipedia.org/wiki/Partition_of_a_set#Definition,
 which is taken from Halmos's Naïve Set Theory,
 "A partition of a set X is -/
 structure partition :=
@@ -107,7 +108,7 @@ is the finset consisting of all elements of type α.
 The proof has been written out in a relatively relaxed tactic style so that you can see how the
 tactic state changes in your favorite editor with lean-integration. -/
 theorem disjoint_union_of_partition (P : partition α) :
-(multiset.join (P.1.val.map (λ S, S.val))).to_finset = univ ∧
+P.1.sup id = univ ∧
 ∀ (b₁ b₂), b₁ ∈ P.1 → b₂ ∈ P.1 → b₁ ≠ b₂ → disjoint b₁ b₂ :=
 begin
   simp [ext],
@@ -115,7 +116,7 @@ begin
   { intro a,
       have hP := P.blocks_partition a,
       exact exists.elim hP (by { intros b hb,
-        exact exists.intro b.1 ⟨exists.intro b ⟨hb.1, rfl⟩, hb.2.1⟩ }) },
+        exact exists.intro b ⟨hb.1, hb.2.1⟩ }) },
   { intros b₁ b₂ hb₁ hb₂ h,
     rw ←ext at h,
     have HP : ∅ ∉ P.blocks := P.blocks_nonempty,
@@ -156,8 +157,8 @@ exact { blocks := P,
 
 namespace partition
 
-/- The next three theorems lay some basic groundwork for showing the equality of two partitions. They
-are based on the corresponding theorems in `data.finset` -/
+/- The next three theorems lay some basic groundwork for showing the equality of two partitions.
+They are based on the corresponding theorems in `data.finset`. -/
 
 /- This theorem proves that two partitions are equal if and only if their "blocks" are equal. This
 follows in Lean because of "proof irrelevance" for terms of type Prop. -/
@@ -166,11 +167,11 @@ follows in Lean because of "proof irrelevance" for terms of type Prop. -/
 by simp
 
 /- This is a version of extensionality for partitions; two partitions P₁ P₂ are equal if and only if
-a finset b is a block of P₁ iff it is a block of P₂ -/
+a finset b is a block of P₁ iff it is a block of P₂. -/
 theorem ext {P₁ P₂ : partition α} : P₁ = P₂ ↔ ∀ b, b ∈ P₁.1 ↔ b ∈ P₂.1 :=
 by simp only [eq_of_blocks_eq, ext]
 
-/- This version of ext is the form suitable for use by the `ext` tactic -/
+/- This version of ext is the form suitable for use by the `ext` tactic. -/
 @[extensionality]
 theorem ext' {P₁ P₂ : partition α} : (∀ b, b ∈ P₁.1 ↔ b ∈ P₂.1) → P₁ = P₂ :=
 ext.2
@@ -178,12 +179,10 @@ ext.2
 /- This definition tells us when a finset of finsets is actually a partition. It uses the second
 (disjoint union) definition of partitions. -/
 def is_partition (P : finset (finset α)) : Prop :=
-∅ ∉ P ∧ P.sup id = univ ∧
-∀ b₁∈ P, ∀ b₂ ∈ P,
-  b₁ ≠ b₂ → disjoint b₁ b₂
+∅ ∉ P ∧ P.sup id = univ ∧ ∀ b₁ b₂, b₁∈ P → b₂ ∈ P → b₁ ≠ b₂ → disjoint b₁ b₂
 
 /- This instance now allows us to use #eval to figure out whether a finset is a partition of the
-underlying fintype or not -/
+underlying fintype or not. -/
 instance decidable_partition (P : finset (finset α)) :
 decidable (is_partition P) :=
 by unfold is_partition; apply_instance
@@ -193,13 +192,15 @@ the fintype corresponding to the set {0, 1, …, n-1}. -/
 #eval (is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 4))) : bool) -- tt
 #eval (is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 5))) : bool) -- ff
 #eval (is_partition ({{0}, {1}, {3}} : finset (finset (fin 4))) : bool) -- ff
+#eval (is_partition ({{0}, {1}, {1,3}} : finset (finset (fin 4))) : bool) -- ff
 
-/- This convenience function lets us create a partition from `is_partition` -/
+/- This convenience function lets us create a partition from `is_partition`. -/
 def of_is_partition {P : finset (finset α)} (h : is_partition P) : (partition α) :=
-partition_of_disjoint_union h.1 h.2.1 (λ x₀ x₁ h₀ h₁, h.2.2 _ h₀ _ h₁)
+partition_of_disjoint_union h.1 h.2.1 h.2.2
 
-/- `dec_trivial` is the way to use the computation of a decidable proposition as a proof; it is
-useful but limited to evaluations that can be completed within a short timeout. We use it to define
+/- We have been using #eval to determine the truth values of decidable propositions. The term
+`dec_trivial` allows us to use computation (in the kernel) as a proof; it is useful, but limited
+to computations that can be completed within a short timeout. We use it to define
 a few explicit partitions of `fin 4` that we will use as running examples. -/
 def P0 : partition (fin 4) :=
 of_is_partition (dec_trivial : is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 4))))
@@ -221,9 +222,25 @@ the powerset of `univ`. -/
 def partitions : finset (finset (finset α)) :=
 (powerset (powerset univ)).filter (λ S, is_partition S)
 
-/- Unfortunately, computing the partitions of fin 3 is about the limit of this naive definition. -/
 #eval partitions (fin 3)
 -- {{{0, 1, 2}}, {{0, 1}, {2}}, {{0, 2}, {1}}, {{0}, {1, 2}}, {{0}, {1}, {2}}}
+/- Unfortunately, computing the partitions of fin 4 causes a timeout with this naive definition. -/
+
+/- The goal of the next few theorems is to prove the following inocuous looking statement:
+
+The number of partitions of a set of size `n` is equal to the number of partitions of the set
+{0, 1, …, n-1}.
+
+Of the results in this file, this is in some sense the "hardest" one to deal with in lean. This may
+be surprising, since it seems so trivial. The reason for the mismatch is that the essence of this
+statement is a "transport of structure" operation -- given a bijection betwen two fintypes, we need
+to show that the partitions are also in bijection. As human mathematicians, this is completely
+obvious; however, this is something which is not (yet) completely trivial in lean. It is hoped that
+automation will be able to dispose of such results in the future.
+
+An additional wrinkle is the fact that we will not have an explicit bijection, but rather only the
+existence of one. We will apply a trick using one of lean's quotient axioms (akin to the use of the
+axiom of choice). -/
 
 lemma mem_partitions (x : finset (finset α)) : x ∈ partitions α ↔ is_partition x :=
 by { simp [partitions], apply and_iff_right_of_imp, simp only [is_partition],
@@ -284,10 +301,10 @@ begin
     split; introv h₀ h₁ h₂ h₃,
     { intros h₄ h₅,
       subst b₁, subst b₂,
-      specialize h₀ _ h₁ _ h₃ _,
+      specialize h₀ _ _ h₁ h₃ _,
       { rw [← map_inter,h₀], exact map_empty _ },
       intro h, subst h, contradiction, },
-    { specialize h₀ _ _ h₁ rfl _ _ h₂ rfl _,
+    { specialize h₀ _ _ _ h₁ rfl _ h₂ rfl _,
       { rw [← map_inter,map_eq_iff_of_equiv] at h₀, rw h₀,
         exact map_empty _ },
       intro h, apply h₃ (map_inj _ h) } }
@@ -309,11 +326,12 @@ dec_trivial
 theorem card_partitions_eq_5_of_card_3 (h : fintype.card α = 3) : card (partitions α) = 5 :=
 (card_partitions_eq_card_partitions_fin h).symm ▸ card_partitions_3
 
-/- We now begin to define a partial order structure on the type `partition α`. We do this by
-imitating the partial order structure on finset given by the subset relation.
-
+/- We now begin to define a partial order structure on the type `partition α`.
 For two partitions P₁ and P₂, we say that P₁ is finer than P₂ (written here as P₁ ⊆ P₂) if
-every element of P₁.blocks is a subset of some element of P₂.blocks -/
+every element of P₁.blocks is a subset of some element of P₂.blocks.
+
+The following theorems and proofs imitate those in `data.finset` which define the partial order
+structure on finset given by the subset relation. -/
 instance : has_subset (partition α) :=
 ⟨λ P₁ P₂, ∀ p ∈ P₁.1, ∃ q, q ∈ P₂.1 ∧ p ⊆ q⟩
 
@@ -385,6 +403,7 @@ end
 
 instance : has_ssubset (partition α) := ⟨λa b, a ⊆ b ∧ ¬ b ⊆ a⟩
 
+/- This instance sets up the poset structure on `partitions α` -/
 instance partial_order_of_partitions : partial_order (partition α) :=
 { le := (⊆),
   lt := (⊂),
@@ -392,6 +411,7 @@ instance partial_order_of_partitions : partial_order (partition α) :=
   le_trans := @subset.trans _ _ _,
   le_antisymm := @subset.antisymm _ _ _ }
 
+/- As a bonus, we show that the  -/
 instance lattice_of_partitions : lattice.lattice (partition α) := sorry
 
 end partition
