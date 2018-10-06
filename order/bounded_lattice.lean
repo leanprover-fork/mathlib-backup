@@ -143,6 +143,10 @@ sup_of_le_left bot_le
 @[simp] theorem sup_eq_bot_iff : a ⊔ b = ⊥ ↔ (a = ⊥ ∧ b = ⊥) :=
 by rw [eq_bot_iff, sup_le_iff]; simp
 
+class is_semilattice_sup_bot_hom {α β : Type*} [semilattice_sup_bot α] [semilattice_sup_bot β] (f : α → β) :=
+(sup_hom : ∀ x y, f (x ⊔ y) = f x ⊔ f y)
+(bot_hom : f ⊥ = ⊥)
+
 end semilattice_sup_bot
 
 instance nat.semilattice_sup_bot : semilattice_sup_bot ℕ :=

@@ -412,6 +412,9 @@ instance : lattice (finset α) :=
 instance : semilattice_inf_bot (finset α) :=
 { bot := ∅, bot_le := empty_subset, ..finset.lattice.lattice }
 
+instance : semilattice_sup_bot (finset α) :=
+{ bot := ∅, bot_le := empty_subset, ..finset.lattice.lattice }
+
 instance : distrib_lattice (finset α) :=
 { le_sup_inf := assume a b c, show (a ∪ b) ∩ (a ∪ c) ⊆ a ∪ b ∩ c,
     by simp only [subset_iff, mem_inter, mem_union, and_imp, or_imp_distrib] {contextual:=tt};
@@ -712,9 +715,17 @@ open function
 def map (f : α ↪ β) (s : finset α) : finset β :=
 ⟨s.1.map f, nodup_map f.2 s.2⟩
 
+lemma map_inj (f : α ↪ β) : injective (map f) :=
+by { rintros ⟨⟩ ⟨⟩ h, congr, apply injective_map f.inj, apply congr_arg finset.val h }
+
+def map' (f : α ↪ β) : finset α ↪ finset β :=
+⟨ map f, map_inj f ⟩
+
+@[simp] lemma coe_map' (f : α ↪ β) (x : finset α) : map' f x = map f x := rfl
+
 @[simp] theorem map_val (f : α ↪ β) (s : finset α) : (map f s).1 = s.1.map f := rfl
 
-@[simp] theorem map_empty (f : α ↪ β) (s : finset α) : (∅ : finset α).map f = ∅ := rfl
+@[simp] theorem map_empty (f : α ↪ β) : (∅ : finset α).map f = ∅ := rfl
 
 variables {f : α ↪ β} {s : finset α}
 
@@ -778,6 +789,15 @@ by simp only [insert_eq, insert_empty_eq_singleton, map_union, map_singleton]
 
 lemma attach_map_val {s : finset α} : s.attach.map (embedding.subtype _) = s :=
 eq_of_veq $ by rw [map_val, attach_val]; exact attach_map_val _
+
+lemma map_eq_iff_of_equiv {t : finset β} (h : α ≃ β) : map h.to_embedding s = t ↔ s = map h.symm.to_embedding t :=
+by split; intro h; subst h; simp only [map_map,map_refl,equiv.symm_trans,embedding.refl_to_embedding,embedding.trans_to_embedding,equiv.trans_symm]
+
+variables [decidable_eq α] [decidable_eq β]
+
+instance {f : α ↪ β} : is_semilattice_sup_bot_hom (map f) :=
+{ bot_hom := map_empty _,
+  sup_hom := map_union }
 
 end map
 
@@ -974,6 +994,18 @@ calc s.card = s.attach.card : card_attach.symm
 ... = t.card : congr_arg card (finset.ext.2 $ λ b,
     ⟨λ h, let ⟨a, ha₁, ha₂⟩ := mem_image.1 h in ha₂ ▸ h₁ _ _,
       λ h, let ⟨a, ha₁, ha₂⟩ := h₃ b h in mem_image.2 ⟨⟨a, ha₁⟩, by simp [ha₂]⟩⟩)
+
+lemma card_eq_of_equiv {s : finset α} {t : finset β} (h : s.to_set ≃ t.to_set) :
+  s.card = t.card :=
+begin
+  let f : Π a ∈ s, β := λ a h', subtype.val (h ⟨_,h'⟩),
+  apply card_congr f; introv,
+  { exact (h ⟨_,ha⟩).property },
+  { intro h', have := (equiv.apply_eq_iff_eq h ⟨a,ha⟩ ⟨b,hb⟩).1 _,
+    injection this, apply subtype.eq h' },
+  { intro h', existsi [(h.symm ⟨_,h'⟩).val,(h.symm ⟨_,h'⟩).property],
+    dsimp [f], rw subtype.eta, simp, },
+end
 
 lemma card_union_add_card_inter [decidable_eq α] (s t : finset α) :
   (s ∪ t).card + (s ∩ t).card = s.card + t.card :=
@@ -1210,6 +1242,10 @@ by unfold fold; rw [insert_val, ndinsert_of_not_mem h, map_cons, fold_cons_left]
   (H : ∀ (x ∈ s) (y ∈ s), g x = g y → x = y) : (s.image g).fold op b f = s.fold op b (f ∘ g) :=
 by simp only [fold, image_val_of_inj_on H, multiset.map_map]
 
+@[simp] theorem fold_map {g : γ ↪ α} {s : finset γ}
+ : (s.map g).fold op b f = s.fold op b (f ∘ g) :=
+by simp only [fold,finset.map_val,multiset.map_map]
+
 @[congr] theorem fold_congr {g : α → β} (H : ∀ x ∈ s, f x = g x) : s.fold op b f = s.fold op b g :=
 by rw [fold, fold, map_congr H]
 
@@ -1265,11 +1301,28 @@ finset.induction_on s (λ _, le_refl _) (λ a s has ih H,
   by simp only [mem_insert, or_imp_distrib, forall_and_distrib, forall_eq] at H;
      simp only [sup_insert]; exact sup_le_sup H.1 (ih H.2))
 
+@[simp] lemma sup_map {f : β ↪ γ} {g : γ → α} : sup (map f s) g = sup s (g ∘ f) :=
+by simp only [sup,fold_map]
+
 lemma le_sup {b : β} (hb : b ∈ s) : f b ≤ s.sup f :=
 by letI := classical.dec_eq β; from
 calc f b ≤ f b ⊔ s.sup f : le_sup_left
   ... = (insert b s).sup f : sup_insert.symm
   ... = s.sup f : by rw [insert_eq_of_mem hb]
+
+open lattice.is_semilattice_sup_bot_hom
+
+lemma sup_hom [semilattice_sup_bot γ] {f : β → α} (g : α → γ)
+  [is_semilattice_sup_bot_hom g] :
+  sup s (g ∘ f) = g (sup s f) :=
+by { have := @fold_hom β α γ has_sup.sup _ _ f ⊥ s has_sup.sup _ _ g _,
+     simp only [sup], rw [← this,bot_hom g],
+     intros, apply sup_hom }
+
+lemma sup_hom' [semilattice_sup_bot β] (g : β → α)
+  [is_semilattice_sup_bot_hom g] :
+  sup s g = g (sup s id) :=
+by rw [← sup_hom g]; simp only [function.comp.right_id]
 
 lemma sup_le {a : α} : (∀b ∈ s, f b ≤ a) → s.sup f ≤ a :=
 by letI := classical.dec_eq β; from
@@ -1282,6 +1335,14 @@ iff.intro (assume h b hb, le_trans (le_sup hb) h) sup_le
 
 lemma sup_mono (h : s₁ ⊆ s₂) : s₁.sup f ≤ s₂.sup f :=
 sup_le $ assume b hb, le_sup (h hb)
+
+@[simp] lemma mem_sup [decidable_eq γ] [decidable_eq β] (x : β) (s : finset γ) (f : γ → finset β) :
+  x ∈ s.sup f ↔ (∃ y ∈ s, x ∈ f y) :=
+begin
+  induction s using finset.induction_on,
+  { simp [sup_empty], rintro ⟨ ⟩ },
+  { simp [sup_cons,or_and_distrib_right,exists_or_distrib,*] }
+end
 
 end sup
 
