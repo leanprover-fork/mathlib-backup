@@ -17,26 +17,13 @@ def bot : setoid α :=
     exact ⟨by { intro, refl }, by { intros, exact a.symm }, by { intros, exact eq.trans a a_1 }⟩ }}
 
 theorem eq_iff_r_eq : ∀ {r₁ r₂ : setoid α}, r₁ = r₂ ↔ r₁.r = r₂.r
-| ⟨r1, e1⟩ ⟨r2, e2⟩
-:= begin
-  intros,
-  split,
-  { intro h, injection h },
-  { intro h, dsimp at h, subst h }
-end
+| ⟨r1, e1⟩ ⟨r2, e2⟩ :=
+iff.intro (λ h, by injection h) (λ h, by dsimp at h; subst h)
 
 theorem eq_iff_eqv_class_eq {r₁ r₂ : setoid α} :
   r₁ = r₂ ↔ (∀ a, let r1 := r₁.r in let r2 := r₂.r in {b | r1 a b} = {b | r2 a b}) :=
-begin
-  rw eq_iff_r_eq,
-  split,
-  { intros h a r1 r2,
-    have : r1 = r2 := h,
-    rw this },
-  { intro h,
-    apply funext,
-    exact h }
-end
+by rw eq_iff_r_eq; exact iff.intro (by { intros h a r1 r2, have : r1 = r2 := h, rw this })
+  ( λ h, by apply funext; exact h )
 
 /- Should we do this without sets? The two definitions below are equivalent,
 so maybe it doesn't matter -/
@@ -79,99 +66,45 @@ eqv_gen.setoid (rel_union r₁ r₂) :=
 rfl
 
 @[simp] theorem subset_union_left (s t : setoid α) : s ⊆ s ∪ t :=
-begin
-  rw [subset_def],
-  intros,
-  rw [set.subset_def],
-  intros,
-  exact eqv_gen.rel a x (or.inl a_1)
-end
+by simp only [subset_def, set.subset_def]; exact λ a x h, eqv_gen.rel a x (or.inl h)
 
 @[simp] theorem subset_union_right (s t : setoid α) : t ⊆ s ∪ t :=
-begin
-  rw [subset_def],
-  intros,
-  rw [set.subset_def],
-  intros,
-  exact eqv_gen.rel a x (or.inr a_1)
-end
+by simp only [subset_def, set.subset_def]; exact λ a x h, eqv_gen.rel a x (or.inr h)
 
-set_option pp.implicit true
-theorem union_subset {s t r : setoid α} (sr : s ⊆ r) (tr : t ⊆ r) : s ∪ t ⊆ r :=
-begin
-  rw [subset_def] at sr tr ⊢,
-  rw [union_def, rel_union],
-  intros,
-  replace sr : _ ⊆ _ := sr a, replace tr : _ ⊆ _ := tr a,
-  rw [set.subset_def] at sr tr ⊢,
-  intros,
-  replace sr := sr x, replace tr := tr x,
-  rw [set.mem_set_of_eq] at a_1 ⊢,
-  sorry
-end
+theorem union_subset {r₁ r₂ r₃ : setoid α} (h13 : r₁ ⊆ r₃) (h23 : r₂ ⊆ r₃) : r₁ ∪ r₂ ⊆ r₃ :=
+by simp only [subset_def, set.subset_def, set.mem_set_of_eq] at h13 h23 ⊢;
+  exact λ a x h, have hor : ∀ a x, @r α r₁ a x ∨ @r α r₂ a x → @r α r₃ a x :=
+    λ a x h, or.elim h (h13 a x) (h23 a x),
+  (@relation.eqv_gen_iff_of_equivalence _ r₃.r a x r₃.2).mp (relation.eqv_gen_mono hor h)
 
 protected def inter (r₁ r₂ : setoid α) : setoid α :=
 { r := λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in r1 s₁ s₂ ∧ r2 s₁ s₂,
-  iseqv := by { unfold equivalence reflexive symmetric transitive,
-    exact ⟨(by { intros, exact ⟨r₁.2.1 x, r₂.2.1 x⟩ }),
-      (by { intros, exact ⟨r₁.2.2.1 a.1, r₂.2.2.1 a.2⟩ }),
-      (by { intros, exact ⟨r₁.2.2.2 a.1 a_1.1, r₂.2.2.2 a.2 a_1.2⟩ })⟩ }}
+  iseqv := ⟨λ x, ⟨r₁.2.1 x, r₂.2.1 x⟩, (λ x y h, ⟨r₁.2.2.1 h.1, r₂.2.2.1 h.2⟩),
+      λ x y z h₁ h₂, ⟨r₁.2.2.2 h₁.1 h₂.1, r₂.2.2.2 h₁.2 h₂.2⟩⟩ }
 
 instance : has_inter (setoid α) :=
 ⟨setoid.inter⟩
 
 theorem inter_def {r₁ r₂ : setoid α} : r₁ ∩ r₂ =
-  { r := λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in r1 s₁ s₂ ∧ r2 s₁ s₂,
-  iseqv := by { unfold equivalence reflexive symmetric transitive,
-    exact ⟨(by { intros, exact ⟨r₁.2.1 x, r₂.2.1 x⟩ }),
-      (by { intros, exact ⟨r₁.2.2.1 a.1, r₂.2.2.1 a.2⟩ }),
-      (by { intros, exact ⟨r₁.2.2.2 a.1 a_1.1, r₂.2.2.2 a.2 a_1.2⟩ })⟩ }} := rfl
+{ r := λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in r1 s₁ s₂ ∧ r2 s₁ s₂,
+  iseqv := ⟨λ x, ⟨r₁.2.1 x, r₂.2.1 x⟩, (λ x y h, ⟨r₁.2.2.1 h.1, r₂.2.2.1 h.2⟩),
+      λ x y z h₁ h₂, ⟨r₁.2.2.2 h₁.1 h₂.1, r₂.2.2.2 h₁.2 h₂.2⟩⟩ } := rfl
 
 @[simp] theorem inter_subset_left (r₁ r₂ : setoid α) : r₁ ∩ r₂ ⊆ r₁ :=
-begin
-  rw [subset_def],
-  intros,
-  rw [set.subset_def],
-  intros,
-  exact and.left a_1
-end
+by simp only [subset_def, set.subset_def]; exact λ a x h, and.left h
 
 @[simp] theorem inter_subset_right (r₁ r₂ : setoid α) : r₁ ∩ r₂ ⊆ r₂ :=
-begin
-  rw [subset_def],
-  intros,
-  rw [set.subset_def],
-  intros,
-  exact and.right a_1
-end
+by simp only [subset_def, set.subset_def]; exact λ a x h, and.right h
 
 theorem subset_inter {s t r : setoid α} (rs : r ⊆ s) (rt : r ⊆ t) : r ⊆ s ∩ t :=
-begin
-  rw [subset_def] at rs rt ⊢,
-  intros,
-  exact set.subset_inter (rs a) (rt a)
-end
+by rw [subset_def] at rs rt ⊢; exact λ a, set.subset_inter (rs a) (rt a)
 
 theorem le_top (r :setoid α) : r ⊆ top :=
-begin
-  rw [subset_def],
-  intros,
-  rw [set.subset_def],
-  intros,
-  trivial
-end
+by simp only [subset_def, set.subset_def];
+exact λ a x h, trivial
 
 theorem bot_le (r : setoid α) : bot ⊆ r :=
-begin
-  rw [subset_def, bot],
-  intros,
-  rw [set.subset_def],
-  intros,
-  rw [set.mem_set_of_eq] at a_1 ⊢,
-  have : a = x := a_1,
-  rw this,
-  exact r.2.1 x
-end
+by simp only [subset_def, bot, set.subset_def, set.mem_set_of_eq]; exact λ a x h, h.symm ▸ (r.2.1 x)
 
 instance lattice_set : lattice.complete_lattice (setoid α) :=
 { lattice.complete_lattice .
