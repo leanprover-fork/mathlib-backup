@@ -704,13 +704,8 @@ open function
 def map (f : α ↪ β) (s : finset α) : finset β :=
 ⟨s.1.map f, nodup_map f.2 s.2⟩
 
-lemma map_inj (f : α ↪ β) : injective (map f) :=
+lemma map_inj_of_embedding (f : α ↪ β) : injective (map f) :=
 by { rintros ⟨⟩ ⟨⟩ h, congr, apply injective_map f.inj, apply congr_arg finset.val h }
-
-def map' (f : α ↪ β) : finset α ↪ finset β :=
-⟨ map f, map_inj f ⟩
-
-@[simp] lemma coe_map' (f : α ↪ β) (x : finset α) : map' f x = map f x := rfl
 
 @[simp] theorem map_val (f : α ↪ β) (s : finset α) : (map f s).1 = s.1.map f := rfl
 
@@ -744,6 +739,8 @@ by simp only [subset.antisymm_iff, map_subset_map]
 def map_embedding (f : α ↪ β) : finset α ↪ finset β := ⟨map f, λ s₁ s₂, map_inj.1⟩
 
 @[simp] theorem map_embedding_apply : map_embedding f s = map f s := rfl
+
+@[simp] lemma coe_map_embedding (f : α ↪ β) (x : finset α) : map_embedding f x = map f x := rfl
 
 theorem map_filter {p : β → Prop} [decidable_pred p] :
   (s.map f).filter p = (s.filter (p ∘ f)).map f :=
