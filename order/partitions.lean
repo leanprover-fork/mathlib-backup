@@ -1,4 +1,4 @@
-import data.set.lattice
+import data.set.lattice --logic.relation
 
 open function
 
@@ -44,20 +44,20 @@ instance : has_subset (setoid α) :=
 --⟨λ r₁ r₂, ∀ (a : α), let r1 := r₁.r in let r2 := r₂.r in ∀ b, r1 a b → r2 a b⟩
 ⟨λ r₁ r₂, ∀ (a : α), let r1 := r₁.r in let r2 := r₂.r in {b | r1 a b} ⊆ {b | r2 a b}⟩
 
-theorem finer_def (r₁ r₂ : setoid α) : r₁ ⊆ r₂ ↔ ∀ (a : α), let r1 := r₁.r in
+theorem subset_def (r₁ r₂ : setoid α) : r₁ ⊆ r₂ ↔ ∀ (a : α), let r1 := r₁.r in
   let r2 := r₂.r in {b | r1 a b} ⊆ {b | r2 a b} :=
 iff.rfl
 
 @[simp] theorem subset.refl (r : setoid α) : r ⊆ r :=
-by rw [finer_def]; exact assume _, set.subset.refl _
+by rw [subset_def]; exact assume _, set.subset.refl _
 
 theorem subset.trans {r₁ r₂ r₃ : setoid α} : r₁ ⊆ r₂ → r₂ ⊆ r₃ → r₁ ⊆ r₃ :=
-by iterate { rw [finer_def] }; exact assume h₁ h₂ a, set.subset.trans (h₁ a) (h₂ a)
+by iterate { rw [subset_def] }; exact assume h₁ h₂ a, set.subset.trans (h₁ a) (h₂ a)
 
 theorem subset.antisymm {r₁ r₂ : setoid α} (H₁ : r₁ ⊆ r₂) (H₂ : r₂ ⊆ r₁) :
 r₁ = r₂ :=
 begin
-  rw finer_def at H₁ H₂,
+  rw subset_def at H₁ H₂,
   rw eq_iff_eqv_class_eq,
   intro a,
   exact set.subset.antisymm (H₁ a) (H₂ a)
@@ -65,25 +65,50 @@ end
 
 instance : has_ssubset (setoid α) := ⟨λa b, a ⊆ b ∧ ¬ b ⊆ a⟩
 
-set_option pp.implicit true
+def rel_union (r₁ r₂ : setoid α) : α → α → Prop :=
+λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in r1 s₁ s₂ ∨ r2 s₁ s₂
+
 protected def union (r₁ r₂ : setoid α) : setoid α :=
-{ r := λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in sorry, --need transitive closure
-  iseqv := by { unfold equivalence reflexive symmetric transitive,
-    sorry
-  }}
+eqv_gen.setoid $ rel_union r₁ r₂
 
 instance : has_union (setoid α) :=
 ⟨setoid.union⟩
 
---theorem union_def {s₁ s₂ : set α} : s₁ ∪ s₂ = {a | a ∈ s₁ ∨ a ∈ s₂} := rfl
+theorem union_def {r₁ r₂ : setoid α} : r₁ ∪ r₂ =
+eqv_gen.setoid (rel_union r₁ r₂) :=
+rfl
 
-@[simp] theorem subset_union_left (s t : setoid α) : s ⊆ s ∪ t := sorry
+@[simp] theorem subset_union_left (s t : setoid α) : s ⊆ s ∪ t :=
+begin
+  rw [subset_def],
+  intros,
+  rw [set.subset_def],
+  intros,
+  exact eqv_gen.rel a x (or.inl a_1)
+end
 
-@[simp] theorem subset_union_right (s t : setoid α) : t ⊆ s ∪ t := sorry
+@[simp] theorem subset_union_right (s t : setoid α) : t ⊆ s ∪ t :=
+begin
+  rw [subset_def],
+  intros,
+  rw [set.subset_def],
+  intros,
+  exact eqv_gen.rel a x (or.inr a_1)
+end
 
+set_option pp.implicit true
 theorem union_subset {s t r : setoid α} (sr : s ⊆ r) (tr : t ⊆ r) : s ∪ t ⊆ r :=
-sorry
---by finish [finer_def, union_def]
+begin
+  rw [subset_def] at sr tr ⊢,
+  rw [union_def, rel_union],
+  intros,
+  replace sr : _ ⊆ _ := sr a, replace tr : _ ⊆ _ := tr a,
+  rw [set.subset_def] at sr tr ⊢,
+  intros,
+  replace sr := sr x, replace tr := tr x,
+  rw [set.mem_set_of_eq] at a_1 ⊢,
+  sorry
+end
 
 protected def inter (r₁ r₂ : setoid α) : setoid α :=
 { r := λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in r1 s₁ s₂ ∧ r2 s₁ s₂,
@@ -104,16 +129,49 @@ theorem inter_def {r₁ r₂ : setoid α} : r₁ ∩ r₂ =
 
 @[simp] theorem inter_subset_left (r₁ r₂ : setoid α) : r₁ ∩ r₂ ⊆ r₁ :=
 begin
-  rw [finer_def, inter_def],
+  rw [subset_def],
   intros,
-  sorry
+  rw [set.subset_def],
+  intros,
+  exact and.left a_1
 end
 
-@[simp] theorem inter_subset_right (r₁ r₂ : setoid α) : r₁ ∩ r₂ ⊆ r₂ := sorry
+@[simp] theorem inter_subset_right (r₁ r₂ : setoid α) : r₁ ∩ r₂ ⊆ r₂ :=
+begin
+  rw [subset_def],
+  intros,
+  rw [set.subset_def],
+  intros,
+  exact and.right a_1
+end
 
 theorem subset_inter {s t r : setoid α} (rs : r ⊆ s) (rt : r ⊆ t) : r ⊆ s ∩ t :=
-sorry
---by finish [finer_def, inter_def]
+begin
+  rw [subset_def] at rs rt ⊢,
+  intros,
+  exact set.subset_inter (rs a) (rt a)
+end
+
+theorem le_top (r :setoid α) : r ⊆ top :=
+begin
+  rw [subset_def],
+  intros,
+  rw [set.subset_def],
+  intros,
+  trivial
+end
+
+theorem bot_le (r : setoid α) : bot ⊆ r :=
+begin
+  rw [subset_def, bot],
+  intros,
+  rw [set.subset_def],
+  intros,
+  rw [set.mem_set_of_eq] at a_1 ⊢,
+  have : a = x := a_1,
+  rw this,
+  exact r.2.1 x
+end
 
 instance lattice_set : lattice.complete_lattice (setoid α) :=
 { lattice.complete_lattice .
@@ -136,10 +194,10 @@ instance lattice_set : lattice.complete_lattice (setoid α) :=
   le_inf       := assume a b c, subset_inter,
 
   top          := top,
-  le_top       := sorry, --assume s a h, trivial,
+  le_top       := le_top,
 
   bot          := bot,
-  bot_le       := sorry, --assume s a, false.elim,
+  bot_le       := bot_le,
 
   Sup          := sorry,--λs, {a | ∃ t ∈ s, a ∈ t },
   le_Sup       := sorry,--assume s t t_in a a_in, ⟨t, ⟨t_in, a_in⟩⟩,
