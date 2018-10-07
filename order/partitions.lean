@@ -77,12 +77,13 @@ instance : has_union (setoid α) :=
 
 --theorem union_def {s₁ s₂ : set α} : s₁ ∪ s₂ = {a | a ∈ s₁ ∨ a ∈ s₂} := rfl
 
-@[simp] theorem subset_union_left (s t : setoid α) : s ⊆ s ∪ t := λ x, or.inl
+@[simp] theorem subset_union_left (s t : setoid α) : s ⊆ s ∪ t := sorry
 
-@[simp] theorem subset_union_right (s t : setoid α) : t ⊆ s ∪ t := λ x, or.inr
+@[simp] theorem subset_union_right (s t : setoid α) : t ⊆ s ∪ t := sorry
 
 theorem union_subset {s t r : setoid α} (sr : s ⊆ r) (tr : t ⊆ r) : s ∪ t ⊆ r :=
-by finish [finer_def, union_def]
+sorry
+--by finish [finer_def, union_def]
 
 protected def inter (r₁ r₂ : setoid α) : setoid α :=
 { r := λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in r1 s₁ s₂ ∧ r2 s₁ s₂,
@@ -108,10 +109,11 @@ begin
   sorry
 end
 
-@[simp] theorem inter_subset_right (r₁ r₂ : setoid α) : r₁ ∩ r₂ ⊆ r₂ := λ x H, and.right H
+@[simp] theorem inter_subset_right (r₁ r₂ : setoid α) : r₁ ∩ r₂ ⊆ r₂ := sorry
 
 theorem subset_inter {s t r : setoid α} (rs : r ⊆ s) (rt : r ⊆ t) : r ⊆ s ∩ t :=
-by finish [finer_def, inter_def]
+sorry
+--by finish [finer_def, inter_def]
 
 instance lattice_set : lattice.complete_lattice (setoid α) :=
 { lattice.complete_lattice .
@@ -134,18 +136,19 @@ instance lattice_set : lattice.complete_lattice (setoid α) :=
   le_inf       := assume a b c, subset_inter,
 
   top          := top,
-  le_top       := assume s a h, trivial,
+  le_top       := sorry, --assume s a h, trivial,
 
   bot          := bot,
-  bot_le       := assume s a, false.elim,
+  bot_le       := sorry, --assume s a, false.elim,
 
-  Sup          := λs, {a | ∃ t ∈ s, a ∈ t },
-  le_Sup       := assume s t t_in a a_in, ⟨t, ⟨t_in, a_in⟩⟩,
-  Sup_le       := assume s t h a ⟨t', ⟨t'_in, a_in⟩⟩, h t' t'_in a_in,
+  Sup          := sorry,--λs, {a | ∃ t ∈ s, a ∈ t },
+  le_Sup       := sorry,--assume s t t_in a a_in, ⟨t, ⟨t_in, a_in⟩⟩,
+  Sup_le       := sorry,--assume s t h a ⟨t', ⟨t'_in, a_in⟩⟩, h t' t'_in a_in,
 
-  Inf          := λs, {a | ∀ t ∈ s, a ∈ t },
-  le_Inf       := assume s t h a a_in t' t'_in, h t' t'_in a_in,
-  Inf_le       := assume s t t_in a h, h _ t_in }
+  Inf          := sorry,--λs, {a | ∀ t ∈ s, a ∈ t },
+  le_Inf       := sorry,--assume s t h a a_in t' t'_in, h t' t'_in a_in,
+  Inf_le       := sorry,--assume s t t_in a h, h _ t_in
+  }
 
 /- We define a partition as a family of nonempty sets such that any element of α is contained in
 exactly one set -/

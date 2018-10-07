@@ -277,7 +277,7 @@ begin
     { specialize h₀ _ _ _ h₁ rfl _ h₂ rfl _,
       { rw [← map_inter,map_eq_iff_of_equiv] at h₀, rw h₀,
         exact map_empty _ },
-      intro h, apply h₃ (map_inj _ h) } }
+      intro h, apply h₃ (map_inj_of_embedding _ h) } }
 end
 
 theorem card_partitions_eq_card_partitions_fin {n : ℕ} (h : fintype.card α = n) :
