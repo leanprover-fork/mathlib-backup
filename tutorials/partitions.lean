@@ -56,7 +56,7 @@ which is taken from Halmos's Naïve Set Theory,
 structure partition :=
 /- a set of nonempty subsets of X  -/
 (blocks : finset (finset α))
-(blocks_nonempty : ∅ ∉ blocks)
+(empty_not_mem_blocks : ∅ ∉ blocks)
 /- such that every element x in X is in exactly one of these subsets." -/
 (blocks_partition : ∀ a, ∃ b, b ∈ blocks ∧ a ∈ b ∧ ∀ b' ∈ blocks, b ≠ b' → a ∉ b')
 /- We could have taken the above definition more literally and defined a partition as a
@@ -119,7 +119,7 @@ begin
         exact exists.intro b ⟨hb.1, hb.2.1⟩ }) },
   { intros b₁ b₂ hb₁ hb₂ h,
     rw ←ext at h,
-    have HP : ∅ ∉ P.blocks := P.blocks_nonempty,
+    have HP : ∅ ∉ P.blocks := P.empty_not_mem_blocks,
     have hP' := P.blocks_partition,
     have Hb₁ : b₁ ≠ ∅ := by { intro h', exact (h'.symm ▸ HP) hb₁ },
     refine disjoint_left.mpr _,
@@ -145,7 +145,7 @@ def partition_of_disjoint_union {P : finset (finset α)} (h₁ : ∅ ∉ P)
 (h₃ : ∀ (b₁ b₂), b₁ ∈ P → b₂ ∈ P → b₁ ≠ b₂ → disjoint b₁ b₂) : partition α :=
 by simp [ext] at h₂;
 exact { blocks := P,
-  blocks_nonempty := h₁,
+  empty_not_mem_blocks := h₁,
   blocks_partition := assume (a : α),
     by replace h₂ : ∃ b, b ∈ P ∧ a ∈ b := h₂ a;
     exact exists.elim h₂ (assume (b : finset α)
@@ -350,7 +350,7 @@ begin
           have : b ⊆ b'' := finset.subset.trans hb'.2 hb''.2,
           have hinter : b ∩ b'' = b := inter_of_subset this,
           have hbne : b ≠ ∅ := by { by_contra H, simp at H,
-            exact s₁.blocks_nonempty (H ▸ h) },
+            exact s₁.empty_not_mem_blocks (H ▸ h) },
           replace hinter := hinter.substr hbne,
           exact (mt disjoint_iff_inter_eq_empty.mp) hinter },
         have b'b : b' = b := subset.antisymm (this.symm ▸ hb''.2) (hb'.2),
@@ -364,7 +364,7 @@ begin
           have : b ⊆ b'' := finset.subset.trans hb'.2 hb''.2,
           have hinter : b ∩ b'' = b := inter_of_subset this,
           have hbne : b ≠ ∅ := by { by_contra H, simp at H,
-            exact s₂.blocks_nonempty (H ▸ h) },
+            exact s₂.empty_not_mem_blocks (H ▸ h) },
           replace hinter := hinter.substr hbne,
           exact (mt disjoint_iff_inter_eq_empty.mp) hinter },
         have b'b : b' = b := subset.antisymm (this.symm ▸ hb''.2) (hb'.2),
@@ -381,7 +381,7 @@ instance partial_order_of_partitions : partial_order (partition α) :=
   le_trans := @subset.trans _ _ _,
   le_antisymm := @subset.antisymm _ _ _ }
 
-/- As a bonus, we show that the  -/
+/- As a bonus, we show that there is a lattice structure on partitions... -/
 instance lattice_of_partitions : lattice.lattice (partition α) := sorry
 
 end partition
