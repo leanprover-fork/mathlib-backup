@@ -1,10 +1,17 @@
-import data.set.lattice --logic.relation
+import data.set.lattice
 
 open function
 
 variable {α : Type*}
 
 namespace setoid
+
+lemma sub_of_gen_sub (x : α → α → Prop) (s : setoid α) (H : ∀ a b : α, x a b → @setoid.r _ s a b) :
+∀ a b : α, (eqv_gen x) a b → @setoid.r _ s a b :=
+λ a b H2, eqv_gen.rec_on H2 H
+  (@setoid.iseqv α s).1
+  (λ x y _ H3, (@setoid.iseqv α s).2.1 H3)
+  (λ x y z _ _ H4 H5,(@setoid.iseqv α s).2.2 H4 H5)
 
 def top : setoid α :=
 { r := λ s₁ s₂, true,
@@ -73,9 +80,11 @@ by simp only [subset_def, set.subset_def]; exact λ a x h, eqv_gen.rel a x (or.i
 
 theorem union_subset {r₁ r₂ r₃ : setoid α} (h13 : r₁ ⊆ r₃) (h23 : r₂ ⊆ r₃) : r₁ ∪ r₂ ⊆ r₃ :=
 by simp only [subset_def, set.subset_def, set.mem_set_of_eq] at h13 h23 ⊢;
-  exact λ a x h, have hor : ∀ a x, @r α r₁ a x ∨ @r α r₂ a x → @r α r₃ a x :=
-    λ a x h, or.elim h (h13 a x) (h23 a x),
-  (@relation.eqv_gen_iff_of_equivalence _ r₃.r a x r₃.2).mp (relation.eqv_gen_mono hor h)
+exact λ a x h, sub_of_gen_sub (rel_union r₁ r₂) r₃
+  (λ x' y' h', or.elim h' (h13 x' y') (h23 x' y')) a x h
+/-  exact λ a x h, have hor : ∀ a x, @r α r₁ a x ∨ @r α r₂ a x → @r α r₃ a x :=
+  λ a x h, or.elim h (h13 a x) (h23 a x),
+  (@relation.eqv_gen_iff_of_equivalence _ r₃.r a x r₃.2).mp (relation.eqv_gen_mono hor h)-/
 
 protected def inter (r₁ r₂ : setoid α) : setoid α :=
 { r := λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in r1 s₁ s₂ ∧ r2 s₁ s₂,
@@ -99,14 +108,38 @@ by simp only [subset_def, set.subset_def]; exact λ a x h, and.right h
 theorem subset_inter {s t r : setoid α} (rs : r ⊆ s) (rt : r ⊆ t) : r ⊆ s ∩ t :=
 by rw [subset_def] at rs rt ⊢; exact λ a, set.subset_inter (rs a) (rt a)
 
-theorem le_top (r :setoid α) : r ⊆ top :=
+theorem le_top (r : setoid α) : r ⊆ top :=
 by simp only [subset_def, set.subset_def];
 exact λ a x h, trivial
 
 theorem bot_le (r : setoid α) : bot ⊆ r :=
 by simp only [subset_def, bot, set.subset_def, set.mem_set_of_eq]; exact λ a x h, h.symm ▸ (r.2.1 x)
 
-instance lattice_set : lattice.complete_lattice (setoid α) :=
+def Sup (s : set (setoid α)) : setoid α :=
+eqv_gen.setoid $ λ (x y : α), ∃ r' : setoid α, r' ∈ s ∧ @r α r' x y
+
+lemma le_Sup (s : set (setoid α)) : ∀ a ∈ s, a ⊆ Sup s :=
+by simp only [subset_def, set.subset_def];
+exact λ a H _ _ h, eqv_gen.rel _ _ (exists.intro a ⟨H, h⟩)
+
+lemma Sup_le (s : set (setoid α)) (a : setoid α) : (∀ b ∈ s, b ⊆ a) → Sup s ⊆ a :=
+by simp only [subset_def, set.subset_def, set.mem_set_of_eq, Sup];
+exact λ H x y h, let rsup := λ x y, ∃ r', r' ∈ s ∧ @r α r' x y in
+  sub_of_gen_sub rsup a (λ x' y' h', exists.elim h' (λ b' hb', H b' hb'.1 x' y' hb'.2)) x y h
+
+def Inf (s : set (setoid α)) : setoid α :=
+eqv_gen.setoid $ λ (x y : α), ∀ r' : setoid α, r' ∈ s → @r α r' x y
+
+lemma Inf_le (s : set (setoid α)) : ∀ a ∈ s, Inf s ⊆ a :=
+by simp only [subset_def, set.subset_def, set.mem_set_of_eq, Inf];
+exact λ a H x y h, let rinf := λ x y, ∀ r', r' ∈ s → @r α r' x y in
+  sub_of_gen_sub rinf a (λ x' y' h', h' a H) x y h
+
+lemma le_Inf (s : set (setoid α)) (a : setoid α) : (∀ b ∈ s, a ⊆ b) → a ⊆ Inf s :=
+by simp only [subset_def, set.subset_def, set.mem_set_of_eq, Inf];
+exact λ H x y h, eqv_gen.rel x y (λ r' hr', H r' hr' x y h)
+
+instance lattice_setoid : lattice.complete_lattice (setoid α) :=
 { lattice.complete_lattice .
   le           := (⊆),
   le_refl      := subset.refl,
@@ -132,19 +165,18 @@ instance lattice_set : lattice.complete_lattice (setoid α) :=
   bot          := bot,
   bot_le       := bot_le,
 
-  Sup          := sorry,--λs, {a | ∃ t ∈ s, a ∈ t },
-  le_Sup       := sorry,--assume s t t_in a a_in, ⟨t, ⟨t_in, a_in⟩⟩,
-  Sup_le       := sorry,--assume s t h a ⟨t', ⟨t'_in, a_in⟩⟩, h t' t'_in a_in,
+  Sup          := Sup,
+  le_Sup       := le_Sup,
+  Sup_le       := Sup_le,
 
-  Inf          := sorry,--λs, {a | ∀ t ∈ s, a ∈ t },
-  le_Inf       := sorry,--assume s t h a a_in t' t'_in, h t' t'_in a_in,
-  Inf_le       := sorry,--assume s t t_in a h, h _ t_in
-  }
+  Inf          := Inf,
+  le_Inf       := le_Inf,
+  Inf_le       := Inf_le }
+
+variables (α) (r : setoid α)
 
 /- We define a partition as a family of nonempty sets such that any element of α is contained in
 exactly one set -/
-
-variables (α) (r : setoid α)
 
 /- Is there a way to set this up so that we talk about the equivalence classes via quot? -/
 structure partition :=
@@ -152,6 +184,7 @@ structure partition :=
 (empty_not_mem_blocks : ∅ ∉ blocks)
 (blocks_partition : ∀ a, ∃ b, b ∈ blocks ∧ a ∈ b ∧ ∀ b' ∈ blocks, b ≠ b' → a ∉ b')
 
+namespace partition
 /- There is a partition associated to an equivalence relation on a set -/
 def coe_of_setoid [setoid α] : partition α :=
 { blocks := {t | ∃ a, {b | a ≈ b} = t},
@@ -181,5 +214,7 @@ def coe_of_setoid [setoid α] : partition α :=
               rw [set.mem_set_of_eq] at ha',
               split, { intro h, exact setoid.trans this h },
               { intro h, exact setoid.trans (setoid.symm this) h } }) }) } } }) } }
+
+end partition
 
 end setoid
