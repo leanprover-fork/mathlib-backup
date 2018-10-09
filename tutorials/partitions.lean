@@ -24,11 +24,11 @@ often easier to handle. -/
 
 /- The following #eval statements show how we can use lean to do basic manipulations on explicit
 finsets of natural numbers -/
-#eval ({1, 3, 4} ∩ {1} = ({1} : finset ℕ) : bool) -- tt
-#eval ({1, 3, 4} ∩ {1} : finset ℕ) -- {1}
-#eval ({3, 4} ∩ {1} : finset ℕ) -- {}
-#eval ({1, 3, 4} ∪ {1} : finset ℕ) -- {1, 3, 4}
-#eval card ({1, 3, 4, 9, 0} : finset ℕ) -- 5
+-- #eval ({1, 3, 4} ∩ {1} = ({1} : finset ℕ) : bool) -- tt
+-- #eval ({1, 3, 4} ∩ {1} : finset ℕ) -- {1}
+-- #eval ({3, 4} ∩ {1} : finset ℕ) -- {}
+-- #eval ({1, 3, 4} ∪ {1} : finset ℕ) -- {1, 3, 4}
+-- #eval card ({1, 3, 4, 9, 0} : finset ℕ) -- 5
 
 /- The following instance is needed so that mathlib is able to computably decide whether two
 finsets are disjoint or not. -/
@@ -37,8 +37,8 @@ decidable (disjoint A B) :=
 by unfold disjoint; apply_instance
 
 /- The following computed examples rely on the above instance to work properly -/
-#eval (disjoint {1, 2, 3} ({1} : finset ℕ) : bool) -- ff
-#eval (disjoint {0, 2, 3} ({1} : finset ℕ) : bool) -- tt
+-- #eval (disjoint {1, 2, 3} ({1} : finset ℕ) : bool) -- ff
+-- #eval (disjoint {0, 2, 3} ({1} : finset ℕ) : bool) -- tt
 
 end finset
 
@@ -189,10 +189,10 @@ by unfold is_partition; apply_instance
 
 /- For our explicit examples below, our underlying fintype will be `fin n` where n : ℕ. This is
 the fintype corresponding to the set {0, 1, …, n-1}. -/
-#eval (is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 4))) : bool) -- tt
-#eval (is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 5))) : bool) -- ff
-#eval (is_partition ({{0}, {1}, {3}} : finset (finset (fin 4))) : bool) -- ff
-#eval (is_partition ({{0}, {1}, {1,3}} : finset (finset (fin 4))) : bool) -- ff
+-- #eval (is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 4))) : bool) -- tt
+-- #eval (is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 5))) : bool) -- ff
+-- #eval (is_partition ({{0}, {1}, {3}} : finset (finset (fin 4))) : bool) -- ff
+-- #eval (is_partition ({{0}, {1}, {1,3}} : finset (finset (fin 4))) : bool) -- ff
 
 /- This convenience function lets us create a partition from `is_partition`. -/
 def of_is_partition {P : finset (finset α)} (h : is_partition P) : (partition α) :=
@@ -211,9 +211,9 @@ of_is_partition (dec_trivial : is_partition ({{0}, {1}, {2}, {3}} : finset (fins
 def P2 : partition (fin 4) :=
 of_is_partition (dec_trivial : is_partition ({{0, 1}, {2}, {3}} : finset (finset (fin 4))))
 
-#eval P0 -- {{0}, {1}, {2, 3}}
-#eval P1 -- {{0}, {1}, {2}, {3}}
-#eval P2 -- {{0, 1}, {2}, {3}}
+-- #eval P0 -- {{0}, {1}, {2, 3}}
+-- #eval P1 -- {{0}, {1}, {2}, {3}}
+-- #eval P2 -- {{0, 1}, {2}, {3}}
 
 variable (α)
 
@@ -222,7 +222,7 @@ the powerset of `univ`. -/
 def partitions : finset (finset (finset α)) :=
 (powerset (powerset univ)).filter (λ S, is_partition S)
 
-#eval partitions (fin 3)
+-- #eval partitions (fin 3)
 -- {{{0, 1, 2}}, {{0, 1}, {2}}, {{0, 2}, {1}}, {{0}, {1, 2}}, {{0}, {1}, {2}}}
 /- Unfortunately, computing the partitions of fin 4 causes a timeout with this naive definition. -/
 
@@ -312,11 +312,11 @@ iff.rfl
 instance decidable_finer (P₁ P₂ : partition α) : decidable (P₁ ⊆ P₂) :=
 by rw [finer_def]; exact decidable_of_iff (∀ p ∈ P₁.1, ∃ q ∈ P₂.1, p ⊆ q) (by simp)
 
-#eval (P0 ⊆ P1 : bool) -- ff
-#eval (P1 ⊆ P0 : bool) -- tt
-#eval (P1 ⊆ P2 : bool) -- tt
-#eval (P0 ⊆ P2 : bool) -- ff
-#eval (P2 ⊆ P0 : bool) -- ff
+-- #eval (P0 ⊆ P1 : bool) -- ff
+-- #eval (P1 ⊆ P0 : bool) -- tt
+-- #eval (P1 ⊆ P2 : bool) -- tt
+-- #eval (P0 ⊆ P2 : bool) -- ff
+-- #eval (P2 ⊆ P0 : bool) -- ff
 
 /- The next three theorems prove the reflexivity, transitivity, and antisymmetry properties of the
 partition (⊆) relation. -/
@@ -337,36 +337,33 @@ exact assume (h₁ : ∀ p ∈ s₁.1, ∃ q, q ∈ s₂.1 ∧ p ⊆ q)
 theorem subset.antisymm {s₁ s₂ : partition α} (H₁ : s₁ ⊆ s₂) (H₂ : s₂ ⊆ s₁) :
 s₁ = s₂ :=
 begin
-  rw finer_def at H₁ H₂,
   have hs₁ := disjoint_union_of_partition s₁, have hs₂ := disjoint_union_of_partition s₂,
-  ext,
-  exact iff.intro (assume (h : b ∈ s₁.blocks),
-    exists.elim (H₁ b h) $
+  ext, rw finer_def at H₁ H₂,
+  exact iff.intro
+    (assume (h : b ∈ s₁.blocks), exists.elim (H₁ b h) $
       assume (b' : finset α) (hb' : b' ∈ s₂.blocks ∧ b ⊆ b'),
       have ∃ q, q ∈ s₁.blocks ∧ b' ⊆ q := H₂ b' hb'.1,
       exists.elim this $ by { assume (b'' : finset α) (hb'' : b'' ∈ s₁.blocks ∧ b' ⊆ b''),
         replace hs₁ := mt (hs₁.2 b b'' h hb''.1), simp at hs₁,
-        have : b = b'' := by { refine hs₁ _,
-          have : b ⊆ b'' := finset.subset.trans hb'.2 hb''.2,
+        have : b = b'' :=
+          have b ⊆ b'' := finset.subset.trans hb'.2 hb''.2,
           have hinter : b ∩ b'' = b := inter_of_subset this,
           have hbne : b ≠ ∅ := by { by_contra H, simp at H,
             exact s₁.empty_not_mem_blocks (H ▸ h) },
-          replace hinter := hinter.substr hbne,
-          exact (mt disjoint_iff_inter_eq_empty.mp) hinter },
-        have b'b : b' = b := subset.antisymm (this.symm ▸ hb''.2) (hb'.2),
+          hs₁ $ (mt disjoint_iff_inter_eq_empty.mp) $ hinter.substr hbne,
+        have b'b : b' = b := subset.antisymm (this.symm ▸ hb''.2) hb'.2,
         exact b'b ▸ hb'.1 })
     (assume (h : b ∈ s₂.blocks), exists.elim (H₂ b h) $
       assume (b' : finset α) (hb' : b' ∈ s₁.blocks ∧ b ⊆ b'),
       have ∃ q, q ∈ s₂.blocks ∧ b' ⊆ q := H₁ b' hb'.1,
       exists.elim this $ by { assume (b'' : finset α) (hb'' : b'' ∈ s₂.blocks ∧ b' ⊆ b''),
         replace hs₂ := mt (hs₂.2 b b'' h hb''.1), simp at hs₂,
-        have : b = b'' := by { refine hs₂ _,
-          have : b ⊆ b'' := finset.subset.trans hb'.2 hb''.2,
+        have : b = b'' :=
+          have b ⊆ b'' := finset.subset.trans hb'.2 hb''.2,
           have hinter : b ∩ b'' = b := inter_of_subset this,
           have hbne : b ≠ ∅ := by { by_contra H, simp at H,
             exact s₂.empty_not_mem_blocks (H ▸ h) },
-          replace hinter := hinter.substr hbne,
-          exact (mt disjoint_iff_inter_eq_empty.mp) hinter },
+          hs₂ $ (mt disjoint_iff_inter_eq_empty.mp) $ hinter.substr hbne,
         have b'b : b' = b := subset.antisymm (this.symm ▸ hb''.2) (hb'.2),
         exact b'b ▸ hb'.1 })
 end
