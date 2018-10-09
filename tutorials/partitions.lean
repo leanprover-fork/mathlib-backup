@@ -23,7 +23,8 @@ This is a very useful theorem as it turns equality of finsets into membership qu
 often easier to handle. -/
 
 /- The following #eval statements show how we can use lean to do basic manipulations on explicit
-finsets of natural numbers -/
+finsets of natural numbers. In VS code you can easily comment and uncomment them by highlighting
+them and then pressing ctrl+/ (or cmd+/ on a Mac) -/
 -- #eval ({1, 3, 4} ∩ {1} = ({1} : finset ℕ) : bool) -- tt
 -- #eval ({1, 3, 4} ∩ {1} : finset ℕ) -- {1}
 -- #eval ({3, 4} ∩ {1} : finset ℕ) -- {}
@@ -33,10 +34,11 @@ finsets of natural numbers -/
 /- The following instance is needed so that mathlib is able to computably decide whether two
 finsets are disjoint or not. -/
 instance decidable_disjoint {β : Type*} [decidable_eq β] {A B : finset β} :
-decidable (disjoint A B) :=
+  decidable (disjoint A B) :=
 by unfold disjoint; apply_instance
 
-/- The following computed examples rely on the above instance to work properly -/
+/- The following computed examples rely on the above instance to work properly. Try pasting them
+above the instance declaration and seeing what happens! -/
 -- #eval (disjoint {1, 2, 3} ({1} : finset ℕ) : bool) -- ff
 -- #eval (disjoint {0, 2, 3} ({1} : finset ℕ) : bool) -- tt
 
@@ -45,13 +47,20 @@ end finset
 open finset fintype
 variable [fintype α]
 /- A fintype is a type with only finitely many distinct terms. We will see that this is a convenient
-stand-in for the underlying finite set of our partition. -/
+stand-in for the underlying finite set of our partition. The main fintype we will use in our
+examples is `fin n` with `n : ℕ`, which is the type of numbers in the set {0, 1, …, n-1}. -/
+
+-- #eval ({1,3} : finset (fin 4)) -- {1,3}
+-- #eval ({1,3} = ({3,1} : finset (fin 4)) : bool) -- tt
+-- #eval ({1,3} ⊆ ({3,2} : finset (fin 4)) : bool) -- ff
+-- #eval ({1,5} : finset (fin 4)) -- {1}
 
 variable (α)
 
 /- The following definition of a partition is based on the one in wikipedia:
 https://en.wikipedia.org/wiki/Partition_of_a_set#Definition,
-which is taken from Halmos's Naïve Set Theory,
+which is taken from Halmos's Naïve Set Theory.
+
 "A partition of a set X is -/
 structure partition :=
 /- a set of nonempty subsets of X  -/
@@ -59,7 +68,14 @@ structure partition :=
 (empty_not_mem_blocks : ∅ ∉ blocks)
 /- such that every element x in X is in exactly one of these subsets." -/
 (blocks_partition : ∀ a, ∃ b, b ∈ blocks ∧ a ∈ b ∧ ∀ b' ∈ blocks, b ≠ b' → a ∉ b')
-/- We could have taken the above definition more literally and defined a partition as a
+
+/- We bundle the data and axioms together in a `structure`, which is a very simple kind of inductive
+type (see Chapter 7 of TPiL). This structure depends on the variable `α`, which is a fintype. It is
+a type and not a set, although there is a universe set `univ` that can be constructed from it. -/
+
+-- #eval (@univ (fin 8) _ : finset (fin 8)) -- {0, 1, 2, 3, 4, 5, 6, 7}
+
+/- We could have taken the definition from Wikipedia more literally and defined a partition as a
 type dependent on X : finset α. If we had done so, we would have needed an extra record in the
 above definition to ensure that the elements of `blocks` are actually all subsets of X and don't
 contain anything from "outside", e.g.:
@@ -75,7 +91,13 @@ structure partition (X : finset α) :=
 (blocks_subset_powerset : blocks ⊆ powerset X)
 
 The declaration `fintype α` above allowed us to be more economical; since
-blocks : finset (finset α), there cannot be anything from "outside" by definition. -/
+blocks : finset (finset α), there cannot be anything from "outside" by definition. In general, using
+types over sets to define a structure is a common idiom in lean, e.g. most if not all of the base
+algebraic typeclasses are defined on types, e.g. `group`, `ring`, `module`.
+See `library/init/algebra/group.lean` in the core lean directory (or on github) for an example.
+
+Following this philosophy, note that subgroups, subrings and submodules are defined in
+mathlib as structures depending on `set α`. See `group_theory/subgroup.lean`, for example. -/
 
 /- The following instance tells lean how to "print" a partition, if its underlying fintype α has
 a way of being printed, since finsets of types with `has_repr` can be printed. -/
@@ -97,8 +119,6 @@ conditions hold:
   disjoint.
 -/
 
--- should we define a finset.join (and add it to mathlib)?
-
 /- The following is the nontrivial-part of the only-if direction of the above alternate
 characterization of a finite set partition. To formalize the second condition above, we apply the
 `multiset.join` operation, which is the (multiplicity-preserving) union of multisets. `data.finset`
@@ -108,8 +128,7 @@ is the finset consisting of all elements of type α.
 The proof has been written out in a relatively relaxed tactic style so that you can see how the
 tactic state changes in your favorite editor with lean-integration. -/
 theorem disjoint_union_of_partition (P : partition α) :
-P.1.sup id = univ ∧
-∀ (b₁ b₂), b₁ ∈ P.1 → b₂ ∈ P.1 → b₁ ≠ b₂ → disjoint b₁ b₂ :=
+  P.1.sup id = univ ∧ ∀ (b₁ b₂), b₁ ∈ P.1 → b₂ ∈ P.1 → b₁ ≠ b₂ → disjoint b₁ b₂ :=
 begin
   simp [ext],
   split,
@@ -134,22 +153,20 @@ end
 h₁, h₂, h₃ (which correspond to the three conditions above), this produces (computably!) a term of
 type `partition α`.
 
-Almost all of the proof is devoted to showing that blocks_partition is satisfied. The proof of that
-proceeds fairly mechanically. First we simplify h₂ a bit and then eliminate the two nested "exists"
-that appear. (The type of the simplified h₂ is written out explicitly after the replace statement.)
-Then the desired existence statement is not hard to prove after using `disjoint_left`. This proof
-has been slightly condensed ("golfed") into term mode, though more explicit type ascriptions are
-provided to help with readability. -/
-def partition_of_disjoint_union {P : finset (finset α)} (h₁ : ∅ ∉ P)
-(h₂ : P.sup id = univ)
-(h₃ : ∀ (b₁ b₂), b₁ ∈ P → b₂ ∈ P → b₁ ≠ b₂ → disjoint b₁ b₂) : partition α :=
+Almost all of the proof is devoted to showing that `blocks_partition` is satisfied. The proof of
+that proceeds fairly mechanically. First we simplify h₂ a bit and then eliminate the two nested
+"exists" that appear. (The type of the simplified h₂ is written out explicitly after the replace
+statement.) Then the desired existence statement is not hard to prove after using `disjoint_left`.
+This proof has been slightly condensed ("golfed") into term mode, though several explicit type
+ascriptions are provided to help with readability. -/
+def partition_of_disjoint_union {P : finset (finset α)} (h₁ : ∅ ∉ P) (h₂ : P.sup id = univ)
+  (h₃ : ∀ b₁ b₂, b₁ ∈ P → b₂ ∈ P → b₁ ≠ b₂ → disjoint b₁ b₂) : partition α :=
 by simp [ext] at h₂;
 exact { blocks := P,
   empty_not_mem_blocks := h₁,
   blocks_partition := assume (a : α),
     by replace h₂ : ∃ b, b ∈ P ∧ a ∈ b := h₂ a;
-    exact exists.elim h₂ (assume (b : finset α)
-      (hb : b ∈ P ∧ a ∈ b),
+    exact exists.elim h₂ (assume (b : finset α) (hb : b ∈ P ∧ a ∈ b),
       and.elim hb $ assume (hb : b ∈ P) (hab : a ∈ b),
         exists.intro b ⟨hb,hab,assume (b' : finset α) (hb' : b' ∈ P) (hbb' : b ≠ b'),
           by replace h₃ : disjoint b b' := h₃ b b' hb hb' hbb';
@@ -183,12 +200,9 @@ def is_partition (P : finset (finset α)) : Prop :=
 
 /- This instance now allows us to use #eval to figure out whether a finset is a partition of the
 underlying fintype or not. -/
-instance decidable_partition (P : finset (finset α)) :
-decidable (is_partition P) :=
+instance decidable_partition (P : finset (finset α)) : decidable (is_partition P) :=
 by unfold is_partition; apply_instance
 
-/- For our explicit examples below, our underlying fintype will be `fin n` where n : ℕ. This is
-the fintype corresponding to the set {0, 1, …, n-1}. -/
 -- #eval (is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 4))) : bool) -- tt
 -- #eval (is_partition ({{0}, {1}, {2, 3}} : finset (finset (fin 5))) : bool) -- ff
 -- #eval (is_partition ({{0}, {1}, {3}} : finset (finset (fin 4))) : bool) -- ff
@@ -229,28 +243,70 @@ def partitions : finset (finset (finset α)) :=
 lemma mem_partitions (x : finset (finset α)) : x ∈ partitions α ↔ is_partition x :=
 by simp [partitions]
 
-/- The goal of the next few theorems is to prove the following inocuous looking statement:
+/- The goal of the next two theorems is to prove the following inocuous looking statement:
 
-The number of partitions of a set of size `n` is equal to the number of partitions of the set
+(*) The number of partitions of a set of size `n` is equal to the number of partitions of the set
 {0, 1, …, n-1}.
 
 Of the results in this file, this is in some sense the "hardest" one to deal with in lean. This may
 be surprising, since it seems so trivial. The reason for the mismatch is that the essence of this
-statement is a "transport of structure" operation -- given a bijection betwen two fintypes, we need
-to show that the partitions are also in bijection. As human mathematicians, this is completely
-obvious; however, this is something which is not (yet) completely trivial in lean. It is hoped that
-automation will be able to dispose of such results in the future.
+statement is a "transport of structure" operation -- given a bijection betwen two fintypes, we want
+to construct a bijection between the partitions. This is the content of the next theorem.
 
-An additional wrinkle is the fact that we will not have an explicit bijection, but rather only the
-existence of one. We will apply a trick using one of lean's quotient axioms (akin to the use of the
-axiom of choice). -/
+As human mathematicians, this is completely obvious; however, this is something which is not (yet)
+completely trivial in lean. It is hoped that automation will be able to dispose of such results in
+the future.-/
 
 variables {α} {β : Type*} [decidable_eq β] [fintype β]
 
 open equiv
 
-def partitions_congr (h : α ≃ β) :
-  to_set (partitions α) ≃ to_set (partitions β) :=
+/- The following definition is a function that takes as input a bijection h between two fintypes
+α and β. Bijections are defined in lean+mathlib as instances of the class `equiv`, denoted by
+the infix operator `≃`. The following is defined in `data.equiv.basic` in mathlib:
+
+structure equiv (α : Sort*) (β : Sort*) :=
+(to_fun    : α → β)
+(inv_fun   : β → α)
+(left_inv  : left_inverse inv_fun to_fun)
+(right_inv : right_inverse inv_fun to_fun)
+
+Confusingly, in lean, a type equipped with an equivalence relation (a reflexive, symmetric, and
+transitive binary relation) is indicated by the instance `has_equiv` and given the notation `≈`. The
+following lines are taken from `library/init/logic.lean` in core lean:
+
+variables {β : Sort v} (r : β → β → Prop)
+
+def reflexive := ∀ x, x ≺ x
+
+def symmetric := ∀ ⦃x y⦄, x ≺ y → y ≺ x
+
+def transitive := ∀ ⦃x y z⦄, x ≺ y → y ≺ z → x ≺ z
+
+def equivalence := reflexive r ∧ symmetric r ∧ transitive r
+
+def mk_equivalence (rfl : reflexive r) (symm : symmetric r) (trans : transitive r) :
+  equivalence r :=
+⟨rfl, symm, trans⟩
+
+As an extended aside, note that the set of equivalence relations on α is naturally in bijection with
+the set of partitions of α; simply take the blocks of each partition to be the equivalence classes
+of the relation and define x ≈ y if ∃ b ∈ blocks, x ∈ b ∧ y ∈ b.
+
+In the file `order/partitions.lean`, which treats partitions of arbitrary sets, the base objects are
+of type `setoid α` and only later are its properties transferred to `partition α`. Setoids are
+structures that consists of a binary relation on α and a proof that it is an equivalence relation).
+Here's the definition from `init/data/setoid.lean`:
+
+class setoid (α : Sort u) :=
+(r : α → α → Prop) (iseqv : equivalence r)
+
+instance setoid_has_equiv {α : Sort u} [setoid α] : has_equiv α :=
+⟨setoid.r⟩
+
+ -/
+
+def partitions_congr (h : α ≃ β) : to_set (partitions α) ≃ to_set (partitions β) :=
 begin
   simp [partitions,set.mem_powerset_iff],
   let f : finset (finset α) ≃ finset (finset β) := finset_equiv_of_equiv
@@ -280,8 +336,22 @@ begin
       intro h, apply h₃ (map_inj_of_embedding _ h) } }
 end
 
+/- What follows is our formalization of (*). There is a wrinkle here; our hypothesis is that our
+fintype α has exactly n elements. We'd like to apply `partitions_congr` to give us a bijection
+between `partitions α` and `partitions (fin n)`, however, it requires as input an _explicit_
+bijection! Certainly, there do exist (many) bijections between α and fin n; however, it's impossible
+to define an explicit one in lean without more information or by using a "choice function" which
+turns an existence statement into actual data. We opt for the latter here, by using the function
+`fintype.equiv_fin`:
+
+fintype.equiv_fin : Π (α : Type u_1) [_inst_1 : fintype α] [_inst_2 : decidable_eq α],
+  trunc (α ≃ fin (card α))
+
+The `trunc` wrapping the equiv is built using a trick with lean's quotient axiom (akin to the use of
+the axiom of choice). We use `trunc.induction_on` to remove it and pull out the bijection. -/
+
 theorem card_partitions_eq_card_partitions_fin {n : ℕ} (h : fintype.card α = n) :
-card (partitions α) = card (partitions (fin n)) :=
+  card (partitions α) = card (partitions (fin n)) :=
 begin
   rw ←h,
   refine trunc.induction_on (fintype.equiv_fin α) _, intro this,
@@ -305,8 +375,7 @@ structure on finset given by the subset relation. -/
 instance : has_subset (partition α) :=
 ⟨λ P₁ P₂, ∀ p ∈ P₁.1, ∃ q, q ∈ P₂.1 ∧ p ⊆ q⟩
 
-theorem finer_def (P₁ P₂ : partition α) : P₁ ⊆ P₂ ↔ ∀ p ∈ P₁.1,
-∃ q, q ∈ P₂.1 ∧ p ⊆ q :=
+theorem finer_def (P₁ P₂ : partition α) : P₁ ⊆ P₂ ↔ ∀ p ∈ P₁.1, ∃ q, q ∈ P₂.1 ∧ p ⊆ q :=
 iff.rfl
 
 instance decidable_finer (P₁ P₂ : partition α) : decidable (P₁ ⊆ P₂) :=
@@ -334,8 +403,7 @@ exact assume (h₁ : ∀ p ∈ s₁.1, ∃ q, q ∈ s₂.1 ∧ p ⊆ q)
       assume (p'' : finset α) (hp'' : p'' ∈ s₃.blocks ∧ p' ⊆ p''),
       exists.intro p'' ⟨hp''.1, subset.trans hp'.2 hp''.2⟩)
 
-theorem subset.antisymm {s₁ s₂ : partition α} (H₁ : s₁ ⊆ s₂) (H₂ : s₂ ⊆ s₁) :
-s₁ = s₂ :=
+theorem subset.antisymm {s₁ s₂ : partition α} (H₁ : s₁ ⊆ s₂) (H₂ : s₂ ⊆ s₁) : s₁ = s₂ :=
 begin
   have hs₁ := disjoint_union_of_partition s₁, have hs₂ := disjoint_union_of_partition s₂,
   ext, rw finer_def at H₁ H₂,
@@ -370,13 +438,17 @@ end
 
 instance : has_ssubset (partition α) := ⟨λa b, a ⊆ b ∧ ¬ b ⊆ a⟩
 
-/- This instance sets up the poset structure on `partitions α` -/
+/- Finally, this instance declares the poset structure on `partitions α`. -/
 instance partial_order_of_partitions : partial_order (partition α) :=
 { le := (⊆),
   lt := (⊂),
   le_refl := subset.refl,
   le_trans := @subset.trans _ _ _,
   le_antisymm := @subset.antisymm _ _ _ }
+
+-- #eval (P0 < P1 : bool) -- ff
+-- #eval (P1 > P0 : bool) -- ff
+-- #eval (P1 ≤ P0 : bool) -- tt
 
 /- As a bonus, we show that there is a lattice structure on partitions... -/
 instance lattice_of_partitions : lattice.lattice (partition α) := sorry
