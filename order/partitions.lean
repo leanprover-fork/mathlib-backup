@@ -1,8 +1,19 @@
-import data.set.lattice
+import data.set.lattice order.order_iso
 
 open function
 
 variable {α : Type*}
+
+namespace set
+
+lemma inter_of_subset {A B : set α} (h : A ⊆ B) : A ∩ B = A :=
+by simp [set.ext_iff]; exact λ a, iff.intro (λ H, H.1) (λ H, ⟨H, set.mem_of_mem_of_subset H h⟩)
+
+theorem disjoint_left {s t : set α} : disjoint s t ↔ ∀ {a}, a ∈ s → a ∉ t :=
+by { simp [disjoint, set.subset_def, set.ext_iff],
+change (∀ (x : α), x ∈ s ∩ t ↔ x ∈ ∅) ↔ ∀ {a : α}, a ∈ s → a ∉ t, simp }
+
+end set
 
 namespace setoid
 
@@ -32,10 +43,7 @@ theorem eq_iff_eqv_class_eq {r₁ r₂ : setoid α} :
 by rw eq_iff_r_eq; exact iff.intro (by { intros h a r1 r2, have : r1 = r2 := h, rw this })
   ( λ h, by apply funext; exact h )
 
-/- Should we do this without sets? The two definitions below are equivalent,
-so maybe it doesn't matter -/
 instance : has_subset (setoid α) :=
---⟨λ r₁ r₂, ∀ (a : α), let r1 := r₁.r in let r2 := r₂.r in ∀ b, r1 a b → r2 a b⟩
 ⟨λ r₁ r₂, ∀ (a : α), let r1 := r₁.r in let r2 := r₂.r in {b | r1 a b} ⊆ {b | r2 a b}⟩
 
 theorem subset_def (r₁ r₂ : setoid α) : r₁ ⊆ r₂ ↔ ∀ (a : α), let r1 := r₁.r in
@@ -82,9 +90,6 @@ theorem union_subset {r₁ r₂ r₃ : setoid α} (h13 : r₁ ⊆ r₃) (h23 : r
 by simp only [subset_def, set.subset_def, set.mem_set_of_eq] at h13 h23 ⊢;
 exact λ a x h, sub_of_gen_sub (rel_union r₁ r₂) r₃
   (λ x' y' h', or.elim h' (h13 x' y') (h23 x' y')) a x h
-/-  exact λ a x h, have hor : ∀ a x, @r α r₁ a x ∨ @r α r₂ a x → @r α r₃ a x :=
-  λ a x h, or.elim h (h13 a x) (h23 a x),
-  (@relation.eqv_gen_iff_of_equivalence _ r₃.r a x r₃.2).mp (relation.eqv_gen_mono hor h)-/
 
 protected def inter (r₁ r₂ : setoid α) : setoid α :=
 { r := λ s₁ s₂, let r1 := r₁.r in let r2 := r₂.r in r1 s₁ s₂ ∧ r2 s₁ s₂,
@@ -173,7 +178,7 @@ instance lattice_setoid : lattice.complete_lattice (setoid α) :=
   le_Inf       := le_Inf,
   Inf_le       := Inf_le }
 
-variables (α) (r : setoid α)
+variables (α) (𝔯 : setoid α)
 
 /- We define a partition as a family of nonempty sets such that any element of α is contained in
 exactly one set -/
@@ -182,38 +187,271 @@ exactly one set -/
 structure partition :=
 (blocks : set (set α))
 (empty_not_mem_blocks : ∅ ∉ blocks)
-(blocks_partition : ∀ a, ∃ b, b ∈ blocks ∧ a ∈ b ∧ ∀ b' ∈ blocks, b ≠ b' → a ∉ b')
+(blocks_partition : ∀ a, ∃ b, b ∈ blocks ∧ a ∈ b ∧ ∀ b' ∈ blocks, a ∈ b' → b = b')
+
+variable {α}
+
+theorem disjoint_union_of_partition (P : partition α) :
+set.sUnion P.1 = @set.univ α ∧
+∀ (b₁ b₂), b₁ ∈ P.1 → b₂ ∈ P.1 → b₁ ≠ b₂ → disjoint b₁ b₂ :=
+begin
+  simp [set.ext_iff],
+  split,
+  { intro a,
+      have hP := P.blocks_partition a,
+      exact exists.elim hP (by { intros b hb,
+        exact exists.intro b ⟨hb.1, hb.2.1⟩ }) },
+  { intros b₁ b₂ hb₁ hb₂ h,
+    rw ←set.ext_iff at h,
+    have HP : ∅ ∉ P.blocks := P.empty_not_mem_blocks,
+    have hP' := P.blocks_partition,
+    have Hb₁ : b₁ ≠ ∅ := by { intro h', exact (h'.symm ▸ HP) hb₁ },
+    refine set.disjoint_left.mpr _,
+    intros a ha,
+    replace hP' := hP' a,
+    exact exists.elim hP' (by { intros b' hb',
+      have Hb' : b' = b₁ := by { have := (hb'.2.2 b₁ hb₁), exact this ha }, intro h',
+      exact h (eq.trans Hb'.symm $ hb'.2.2 b₂ hb₂ $ Hb'.symm ▸ h') }) }
+end
+
+def partition_of_disjoint_union {P : set (set α)} (h₁ : ∅ ∉ P)
+(h₂ : set.sUnion P = @set.univ α)
+(h₃ : ∀ (b₁ b₂), b₁ ∈ P → b₂ ∈ P → b₁ ≠ b₂ → disjoint b₁ b₂) : partition α :=
+by simp [set.ext_iff] at h₂;
+exact { blocks := P,
+  empty_not_mem_blocks := h₁,
+  blocks_partition := assume (a : α),
+    by replace h₂ : ∃ b, b ∈ P ∧ a ∈ b := h₂ a;
+    exact exists.elim h₂ (assume (b : set α)
+      (hb : b ∈ P ∧ a ∈ b),
+      and.elim hb $ assume (hb : b ∈ P) (hab : a ∈ b),
+        exists.intro b ⟨hb,hab,assume (b' : set α) (hb' : b' ∈ P) (hab' : a ∈ b'),
+          by { have := mt (h₃ b b' hb hb'), haveI := classical.prop_decidable,
+            simp at this, refine this (mt disjoint_iff.mp _),
+            change b ∩ b' ≠ ∅,
+            refine @set.ne_empty_of_mem _ (b ∩ b') a _,
+            exact set.mem_inter hab hab' }⟩) }
 
 namespace partition
+variables {α} (P : partition α)
+
+theorem eq_of_blocks_eq : ∀ {P₁ P₂ : partition α}, P₁ = P₂ ↔ P₁.blocks = P₂.blocks
+| ⟨_, _, _⟩ ⟨_, _, _⟩ :=
+by simp
+
+theorem ext {P₁ P₂ : partition α} : P₁ = P₂ ↔ ∀ b, b ∈ P₁.1 ↔ b ∈ P₂.1 :=
+by simp only [eq_of_blocks_eq, set.ext_iff]
+
+@[extensionality]
+theorem ext' {P₁ P₂ : partition α} : (∀ b, b ∈ P₁.1 ↔ b ∈ P₂.1) → P₁ = P₂ :=
+ext.2
+
+theorem setoid_blocks_partition : ∀ a : α, ∃ b : set α, b ∈ {t | ∃ a : α, {b | a ≈ b} = t} ∧
+  a ∈ b ∧ ∀ b' ∈ {t | ∃ a : α, {b | a ≈ b} = t}, a ∈ b' → b = b' :=
+let r' := 𝔯.r in
+  assume a, by { exact exists.intro {b | a ≈ b}
+    (by { split, { exact exists.intro a rfl },
+      { split, { simp },
+        { simp only [set.ext_iff, set.mem_set_of_eq],
+          intros x h₁ h₂ a',
+          exact exists.elim h₁ (by { intros y hy,
+            have ha : y ≈ a := (hy a).mpr h₂, have ha' : y ≈ a' ↔ a' ∈ x := hy a',
+            split, { intro H, exact ha'.mp (setoid.trans ha H) },
+            { intro H, exact setoid.trans (setoid.symm ha) (ha'.mpr H) } }) }}})}
+
 /- There is a partition associated to an equivalence relation on a set -/
-def coe_of_setoid [setoid α] : partition α :=
+def coe_of_setoid : partition α :=
+let r' := 𝔯.r in
 { blocks := {t | ∃ a, {b | a ≈ b} = t},
   empty_not_mem_blocks := by { rw [set.nmem_set_of_eq], intro h,
     exact exists.elim h (by { intros a ha, simp [set.eq_empty_iff_forall_not_mem] at ha,
       exact ha a (setoid.refl a) }) },
-  blocks_partition := assume a, by {
-    exact exists.intro ({b | a ≈ b}) (by {
-      split,
-      { exact exists.intro a (by { refl }) },
-      { split,
-        { simp },
-        { intros x h₁ h₂,
-          rw [ne, set.ext_iff] at h₂,
-          intro H,
-          rw [set.mem_set_of_eq] at h₁,
-          exact exists.elim h₁ (by {
-            intros a' ha',
-            rw [set.ext_iff] at ha',
-            have := (ha' a).mpr H,
-            rw [set.mem_set_of_eq] at this,
-            exact h₂ (by {
-              intro a''',
-              replace ha' := ha' a''',
-              refine iff.trans _ ha',
-              rw [set.mem_set_of_eq, set.mem_set_of_eq],
-              rw [set.mem_set_of_eq] at ha',
-              split, { intro h, exact setoid.trans this h },
-              { intro h, exact setoid.trans (setoid.symm this) h } }) }) } } }) } }
+  blocks_partition := setoid_blocks_partition 𝔯 }
+
+def setoid_of_partition : setoid α :=
+{ r := λ x y, ∃ b, b ∈ P.blocks ∧ x ∈ b ∧ y ∈ b,
+  iseqv := ⟨λ x, exists.elim (P.blocks_partition x) (λ b h, exists.intro b ⟨h.1, h.2.1, h.2.1⟩),
+    λ x y H, exists.elim H (λ b hb, exists.intro b ⟨hb.1, hb.2.2, hb.2.1⟩),
+    λ x y z hxy hyz, exists.elim hxy $ λ b hb, exists.elim hyz $
+      λ b' hb', exists.elim (P.blocks_partition y) $
+        λ b'' hb'', by { have Hb : b'' = b := hb''.2.2 b hb.1 hb.2.2,
+          have Hb' : b'' = b' := hb''.2.2 b' hb'.1 hb'.2.1,
+          exact exists.intro b'' ⟨hb''.1, Hb.symm ▸ hb.2.1, Hb'.symm ▸ hb'.2.2⟩ }⟩ }
+
+theorem setoid_partition_setoid : setoid_of_partition (coe_of_setoid 𝔯) = 𝔯 :=
+begin
+  unfold setoid_of_partition coe_of_setoid,
+  simp [setoid.eq_iff_r_eq],
+  ext x y, split,
+  { intro H, exact exists.elim H (λ b hb, exists.elim hb.1
+    (by { intros a ha,
+    have hax : x ≈ a := by { have := ha.substr hb.2.1, rw [set.mem_set_of_eq] at this,
+      exact setoid.symm this },
+    have hay : y ≈ a := by { have := ha.substr hb.2.2, rw [set.mem_set_of_eq] at this,
+      exact setoid.symm this },
+    exact setoid.trans hax (setoid.symm hay) })) },
+  { intro H, exact exists.elim (setoid_blocks_partition 𝔯 x)
+    (by { intros b h, exact exists.intro b (⟨exists.intro x $ exists.elim h.1 $
+      λ y' hy', by { simp only [set.ext_iff, set.mem_set_of_eq] at hy' ⊢,
+        have Hy'x : y' ≈ x := (hy' x).mpr h.2.1,
+        intro a, split, { intro ha, exact (hy' a).mp (setoid.trans Hy'x ha) },
+        { intro ha, exact setoid.trans (setoid.symm Hy'x) ((hy' a).mpr ha) } },
+      h.2.1, exists.elim h.1 $ λ y' hy', by simp [set.ext_iff] at hy';
+        exact (hy' y).mp (setoid.trans ((hy' x).mpr h.2.1) H : y' ≈ y)⟩) }) }
+end
+
+theorem partition_setoid_partition : coe_of_setoid (setoid_of_partition P) = P :=
+begin
+  unfold setoid_of_partition coe_of_setoid,
+  simp [eq_of_blocks_eq],
+  ext x, split,
+  { intro H, simp only [set.mem_set_of_eq] at H,
+    exact exists.elim H (by { intros a ha,
+      replace ha : {y : α | ∃ (b : set α), b ∈ @blocks α P ∧ a ∈ b ∧ y ∈ b} = x := ha,
+      exact exists.elim (P.blocks_partition a)
+        (by { intros x' hx',
+          have : x = x' := by { rw ←ha,
+            ext y, rw [set.mem_set_of_eq], split,
+            { intro hy, exact exists.elim hy
+              (λ b' hb', (hx'.2.2 b' hb'.1 hb'.2.1).substr hb'.2.2) },
+            { intro hy, exact exists.intro x' ⟨hx'.1, hx'.2.1, hy⟩} },
+        exact this.symm ▸ hx'.1 }) }) },
+  { intro H, simp only [set.mem_set_of_eq],
+    change ∃ a, {y | ∃ b, b ∈ P.blocks ∧ a ∈ b ∧ y ∈ b} = x,
+    have xne : x ≠ ∅ := λ h, (h.symm ▸ P.empty_not_mem_blocks) H,
+    exact exists.elim (set.exists_mem_of_ne_empty xne) (by {
+      intros a ha,
+      exact exists.intro a (by { ext y, simp only [set.mem_set_of_eq],
+        split,
+        { intro hy, exact exists.elim hy
+          (by { intros b hb,
+            have := P.blocks_partition a,
+            exact exists.elim this
+              (by { intros b' hb',
+              have hb'b : b' = b := hb'.2.2 b hb.1 hb.2.1,
+              have hb'x : b' = x := hb'.2.2 x H ha,
+              exact (eq.trans hb'b.symm hb'x).subst hb.2.2, }) }) },
+        { intro hy, exact exists.intro x ⟨H, ha, hy⟩ } }) }) }
+end
+
+instance : has_subset (partition α) :=
+⟨λ P₁ P₂, ∀ p ∈ P₁.1, ∃ q, q ∈ P₂.1 ∧ p ⊆ q⟩
+
+theorem subset_def (P₁ P₂ : partition α) : P₁ ⊆ P₂ ↔ ∀ p ∈ P₁.1,
+∃ q, q ∈ P₂.1 ∧ p ⊆ q :=
+iff.rfl
+
+@[simp] theorem subset.refl (P : partition α) : P ⊆ P :=
+by rw [subset_def]; exact assume p H, exists.intro p ⟨H, set.subset.refl p⟩
+
+theorem subset.trans {s₁ s₂ s₃ : partition α} : s₁ ⊆ s₂ → s₂ ⊆ s₃ → s₁ ⊆ s₃ :=
+by iterate { rw subset_def };
+exact assume (h₁ : ∀ p ∈ s₁.1, ∃ q, q ∈ s₂.1 ∧ p ⊆ q)
+  (h₂ : ∀ p ∈ s₂.1, ∃ q, q ∈ s₃.1 ∧ p ⊆ q) (p : set α) (hp : p ∈ s₁.1),
+  exists.elim (h₁ p hp : ∃ q, q ∈ s₂.1 ∧ p ⊆ q)
+    (assume (p' : set α) (hp' : p' ∈ s₂.blocks ∧ p ⊆ p'),
+    exists.elim (h₂ p' hp'.1 : ∃ q, q ∈ s₃.1 ∧ p' ⊆ q) $
+      assume (p'' : set α) (hp'' : p'' ∈ s₃.blocks ∧ p' ⊆ p''),
+      exists.intro p'' ⟨hp''.1, set.subset.trans hp'.2 hp''.2⟩)
+
+theorem subset.antisymm {s₁ s₂ : partition α} (H₁ : s₁ ⊆ s₂) (H₂ : s₂ ⊆ s₁) :
+s₁ = s₂ :=
+begin
+  haveI := classical.prop_decidable,
+  rw subset_def at H₁ H₂,
+  have hs₁ := disjoint_union_of_partition s₁, have hs₂ := disjoint_union_of_partition s₂,
+  ext,
+  exact iff.intro (assume (h : b ∈ s₁.blocks),
+    exists.elim (H₁ b h) $
+      assume (b' : set α) (hb' : b' ∈ s₂.blocks ∧ b ⊆ b'),
+      have ∃ q, q ∈ s₁.blocks ∧ b' ⊆ q := H₂ b' hb'.1,
+      exists.elim this $ by { assume (b'' : set α) (hb'' : b'' ∈ s₁.blocks ∧ b' ⊆ b''),
+        replace hs₁ := mt (hs₁.2 b b'' h hb''.1), simp at hs₁,
+        have : b = b'' := by { refine hs₁ _,
+          have : b ⊆ b'' := set.subset.trans hb'.2 hb''.2,
+          have hinter : b ∩ b'' = b := set.inter_of_subset this,
+          have hbne : b ≠ ∅ := by { by_contra H, simp at H,
+            exact s₁.empty_not_mem_blocks (H ▸ h) },
+          replace hinter := hinter.substr hbne,
+          simp [disjoint], exact hinter },
+        have b'b : b' = b := set.subset.antisymm (this.symm ▸ hb''.2) (hb'.2),
+        exact b'b ▸ hb'.1 })
+    (assume (h : b ∈ s₂.blocks), exists.elim (H₂ b h) $
+      assume (b' : set α) (hb' : b' ∈ s₁.blocks ∧ b ⊆ b'),
+      have ∃ q, q ∈ s₂.blocks ∧ b' ⊆ q := H₁ b' hb'.1,
+      exists.elim this $ by { assume (b'' : set α) (hb'' : b'' ∈ s₂.blocks ∧ b' ⊆ b''),
+        replace hs₂ := mt (hs₂.2 b b'' h hb''.1), simp at hs₂,
+        have : b = b'' := by { refine hs₂ _,
+          have : b ⊆ b'' := set.subset.trans hb'.2 hb''.2,
+          have hinter : b ∩ b'' = b := set.inter_of_subset this,
+          have hbne : b ≠ ∅ := by { by_contra H, simp at H,
+            exact s₂.empty_not_mem_blocks (H ▸ h) },
+          replace hinter := hinter.substr hbne,
+          simp [disjoint], exact hinter },
+        have b'b : b' = b := set.subset.antisymm (this.symm ▸ hb''.2) (hb'.2),
+        exact b'b ▸ hb'.1 })
+end
+
+instance : has_ssubset (partition α) := ⟨λa b, a ⊆ b ∧ ¬ b ⊆ a⟩
+
+/- This instance sets up the poset structure on `partitions α` -/
+instance partial_order_of_partitions : partial_order (partition α) :=
+{ le := (⊆),
+  lt := (⊂),
+  le_refl := subset.refl,
+  le_trans := @subset.trans _,
+  le_antisymm := @subset.antisymm _ }
+
+set_option pp.implicit true
+
+theorem setoid_of_partition_order_preserving (s₁ s₂ : setoid α) :
+  s₁ ⊆ s₂ ↔ coe_of_setoid s₁ ⊆ coe_of_setoid s₂ :=
+by { simp [coe_of_setoid, subset_def, setoid.subset_def, set.ext_iff, set.subset_def],
+    split,
+    { intros H p x hx,
+      exact exists.intro {x' | @r α s₂ x x'}
+        ⟨exists.intro x (by { intro y, replace hx : ∀ x', @r α s₁ x x' ↔ x' ∈ p := hx,
+          change @r α s₂ x y ↔ @r α s₂ x y, trivial }),
+        by { intros y hy, change @r α s₂ x y, exact H x y ((hx y).mpr hy) }⟩ },
+    { intros H x y hxy,
+      have := H {x' | @r α s₁ x x'} x (by { intro x', trivial }),
+      exact exists.elim this (by {
+        intros q hq,
+        have Hx : x ∈ q := hq.2 x (s₁.2.1 x),
+        have Hy : y ∈ q := hq.2 y hxy,
+        exact exists.elim hq.1 (by { intros a ha,
+          have hax : @r α s₂ a x := (ha x).mpr Hx,
+          have hay : @r α s₂ a y := (ha y).mpr Hy,
+          exact s₂.2.2.2 (s₂.2.2.1 hax) hay }) }) } }
+
+lemma order_iso_setoid_partition : @order_iso (setoid α) (partition α) (⊆)
+  (⊆) :=
+{ to_fun := coe_of_setoid,
+  inv_fun := setoid_of_partition,
+  left_inv := setoid_partition_setoid,
+  right_inv := partition_setoid_partition,
+  ord := by { intros s₁ s₂,
+    change s₁ ⊆ s₂ ↔ coe_of_setoid s₁ ⊆ coe_of_setoid s₂,
+    exact setoid_of_partition_order_preserving s₁ s₂ } }
+
+theorem gc : coe_of_setoid 𝔯 ≤ P ↔ 𝔯 ≤ setoid_of_partition P :=
+begin
+  change coe_of_setoid 𝔯 ⊆ P ↔ 𝔯 ⊆ setoid_of_partition P,
+  have : coe_of_setoid 𝔯 ⊆ P ↔ coe_of_setoid 𝔯 ⊆ coe_of_setoid (setoid_of_partition P) :=
+    by rw partition_setoid_partition,
+  rw [setoid_of_partition_order_preserving],
+  rw this
+end
+
+protected def galois_insertion : @galois_insertion (setoid α) (partition α) _ _
+  (λ S, coe_of_setoid S) (λ P, setoid_of_partition P) :=
+{ choice := λ S h, coe_of_setoid S,
+  gc := gc,
+  le_l_u := λ P, le_of_eq (partition_setoid_partition P).symm,
+  choice_eq := λ S h, rfl }
+
+instance : lattice.complete_lattice (partition α) :=
+partition.galois_insertion.lift_complete_lattice
 
 end partition
 
