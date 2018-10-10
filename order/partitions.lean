@@ -15,6 +15,20 @@ change (∀ (x : α), x ∈ s ∩ t ↔ x ∈ ∅) ↔ ∀ {a : α}, a ∈ s →
 
 end set
 
+namespace order_iso
+variables {β : Type*} {γ : Type*} [preorder β] [preorder γ] (oi : @order_iso β γ (≤) (≤))
+
+theorem to_galois_connection : galois_connection oi oi.symm :=
+λ b g, by rw [ord' oi, apply_inverse_apply]
+
+protected def to_galois_insertion : @galois_insertion β γ _ _ (oi) (oi.symm) :=
+{ choice := λ b h, oi b,
+  gc := to_galois_connection oi,
+  le_l_u := λ g, le_of_eq (oi.right_inv g).symm,
+  choice_eq := λ b h, rfl }
+
+end order_iso
+
 namespace setoid
 
 lemma sub_of_gen_sub (x : α → α → Prop) (s : setoid α) (H : ∀ a b : α, x a b → @setoid.r _ s a b) :
@@ -350,8 +364,6 @@ instance partial_order_of_partitions : partial_order (partition α) :=
   le_trans := @subset.trans _,
   le_antisymm := @subset.antisymm _ }
 
-set_option pp.implicit true
-
 theorem setoid_of_partition_order_preserving (s₁ s₂ : setoid α) :
   s₁ ⊆ s₂ ↔ coe_of_setoid s₁ ⊆ coe_of_setoid s₂ :=
 by simp [coe_of_setoid, subset_def, setoid.subset_def, set.ext_iff, set.subset_def];
@@ -363,26 +375,15 @@ exact iff.intro
       exists.elim hq.1 $ λ a ha, have hax : @r α s₂ a x := (ha x).mpr Hx,
         have hay : @r α s₂ a y := (ha y).mpr Hy, s₂.2.2.2 (s₂.2.2.1 hax) hay)
 
-lemma order_iso_setoid_partition : @order_iso (setoid α) (partition α) (⊆) (⊆) :=
+def order_iso_setoid_partition : @order_iso (setoid α) (partition α) (≤) (≤) :=
 { to_fun := coe_of_setoid,
   inv_fun := setoid_of_partition,
   left_inv := setoid_partition_setoid,
   right_inv := partition_setoid_partition,
   ord := setoid_of_partition_order_preserving }
 
-theorem gc : coe_of_setoid 𝔯 ≤ P ↔ 𝔯 ≤ setoid_of_partition P :=
-calc _ ↔ coe_of_setoid 𝔯 ⊆ coe_of_setoid (setoid_of_partition P) : by rw partition_setoid_partition
-... ↔ 𝔯 ⊆ _ : by rw setoid_of_partition_order_preserving
-
-protected def galois_insertion : @galois_insertion (setoid α) (partition α) _ _
-  (λ S, coe_of_setoid S) (λ P, setoid_of_partition P) :=
-{ choice := λ S h, coe_of_setoid S,
-  gc := gc,
-  le_l_u := λ P, le_of_eq (partition_setoid_partition P).symm,
-  choice_eq := λ S h, rfl }
-
 instance : lattice.complete_lattice (partition α) :=
-partition.galois_insertion.lift_complete_lattice
+(order_iso.to_galois_insertion order_iso_setoid_partition).lift_complete_lattice
 
 end partition
 
