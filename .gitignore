@@ -1,3 +1,4 @@
 *.olean
+*.depend
 /_target
 /leanpkg.path
