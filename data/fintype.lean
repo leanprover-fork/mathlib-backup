@@ -5,7 +5,7 @@ Author: Mario Carneiro
 
 Finite types.
 -/
-import data.finset algebra.big_operators data.array.lemmas data.vector2
+import data.finset algebra.big_operators data.array.lemmas data.vector2 data.equiv.basic data.equiv.encodable
 universes u v
 
 variables {α : Type*} {β : Type*} {γ : Type*}
@@ -587,3 +587,58 @@ lemma fintype.card_equiv [fintype α] [fintype β] (e : α ≃ β) :
 fintype.card_congr (equiv_congr (equiv.refl α) e) ▸ fintype.card_perm
 
 end equiv
+
+section choose_unique
+open fintype
+open equiv
+
+variables [fintype α] [decidable_eq α] (p : α → Prop) [decidable_pred p]
+
+def choose_unique_x (p_exists : ∃ a : α, p a) (p_unique : ∀ a b : α, p a → p b → a = b) : {a // p a} := begin
+apply @trunc.lift (α ≃ fin (card α)) _ _ _ (equiv_fin α),
+intro equiv_fin,
+let G : fin (card α) → Prop := λ f, p (equiv_fin.inv_fun f),
+have G_exists : {f : fin (card α) // G f},
+apply @encodable.choose_x (fin (card α)) G,
+cases p_exists with p_w p_h,
+existsi equiv_fin.to_fun p_w,
+change p (equiv_fin.inv_fun (equiv_fin.to_fun p_w)),
+rw equiv_fin.left_inv, assumption,
+cases G_exists, existsi (equiv_fin.inv_fun G_exists_val),
+exact G_exists_property,
+intros,
+have all_equal : (Π a b : {a // p a}, a = b),
+rintros ⟨a_w, a_h⟩ ⟨b_w, b_h⟩,
+congr, apply p_unique;  assumption,
+apply all_equal
+end
+
+def choose_unique (p_exists : ∃ a : α, p a) (p_unique : ∀ a b : α, p a → p b → a = b) : α
+:= (choose_unique_x p p_exists p_unique).1
+
+def choose_unique_spec {p_exists : ∃ a : α, p a} {p_unique : ∀ a b : α, p a → p b → a = b}
+: p (choose_unique p p_exists p_unique)
+:= (choose_unique_x p p_exists p_unique).2
+end choose_unique
+
+section bijection_inverse
+open function
+
+variables [fintype α] [decidable_eq α]
+variables [fintype β] [decidable_eq β]
+variables {f : α → β} 
+
+def bij_inv (f_bij : bijective f) (b : β) : α
+:= choose_unique (λ a, f a = b) (f_bij.right b) (λ a1 a2 b1 b2, by apply f_bij.left; rw [b1, b2])
+
+def bij_inv_left_inverse (f_bij : bijective f) : left_inverse (bij_inv f_bij) f
+:= λ a, f_bij.left (choose_unique_spec (λ a', f a' = f a))
+
+def bij_inv_right_inverse (f_bij : bijective f) : right_inverse (bij_inv f_bij) f
+:= λ b, choose_unique_spec (λ a', f a' = b)
+
+def bij_inv_bijective (f_bij : bijective f) : bijective (bij_inv f_bij)
+:= ⟨injective_of_left_inverse (bij_inv_right_inverse _)
+, surjective_of_has_right_inverse ⟨f, bij_inv_left_inverse _⟩⟩ 
+
+end bijection_inverse
