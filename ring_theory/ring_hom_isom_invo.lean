@@ -184,9 +184,16 @@ def id_is_equiv (R : Type*) : equiv R R :=
 ⟨id, id, λ x, by rw [id.def, id.def], λ x, by rw [id.def, id.def]⟩ 
 
 def id_is_isom (R : Type*) [ring R] : ring_isom R R := 
-⟨id_is_equiv R, λ (x y : R), by dunfold id_is_equiv; simp only [id.def], by dunfold id_is_equiv; simp, by dunfold id_is_equiv; simp only [id.def]⟩
+⟨ id_is_equiv R, 
+  λ (x y : R), by dunfold id_is_equiv; simp only [id.def], 
+  by dunfold id_is_equiv; simp, 
+  by dunfold id_is_equiv; simp only [id.def]⟩
 
 def id_is_anti_isom (R : Type*) [comm_ring R] : ring_anti_isom R R := comm_ring.isom_to_anti_isom (id_is_isom R) 
 
 def id_is_invo (R : Type*) [comm_ring R] : ring_invo R :=
-⟨id_is_anti_isom R, begin dunfold id_is_anti_isom, dunfold id_is_isom, dunfold id_is_equiv, dunfold comm_ring.isom_to_anti_isom, simp only [id.def], exact eq.refl end⟩ 
+⟨ id_is_anti_isom R, 
+  begin 
+    dunfold id_is_anti_isom id_is_isom id_is_equiv comm_ring.isom_to_anti_isom, 
+    simp, 
+  end⟩ 
