@@ -30,7 +30,7 @@ fintype.complete x
 
 @[simp] theorem mem_univ_val : ∀ x, x ∈ (univ : finset α).1 := mem_univ
 
-@[simp] lemma coe_univ : ↑(finset.univ : finset α) = (set.univ : set α) :=
+@[simp] lemma coe_univ : ↑(univ : finset α) = (set.univ : set α) :=
 by ext; simp
 
 theorem subset_univ (s : finset α) : s ⊆ univ := λ a _, mem_univ a
@@ -60,6 +60,15 @@ decidable_of_iff (∃ a ∈ @univ α _, p a) (by simp)
 instance decidable_eq_equiv_fintype [fintype α] [decidable_eq β] :
   decidable_eq (α ≃ β) :=
 λ a b, decidable_of_iff (a.1 = b.1) ⟨λ h, equiv.ext _ _ (congr_fun h), congr_arg _⟩
+
+instance decidable_injective_fintype [fintype α] [decidable_eq α] [decidable_eq β] :
+  decidable_pred (injective : (α → β) → Prop) := λ x, by unfold injective; apply_instance
+
+instance decidable_surjective_fintype [fintype α] [decidable_eq α] [fintype β] [decidable_eq β] :
+  decidable_pred (surjective : (α → β) → Prop) := λ x, by unfold surjective; apply_instance
+
+instance decidable_bijective_fintype [fintype α] [decidable_eq α] [fintype β] [decidable_eq β] :
+  decidable_pred (bijective : (α → β) → Prop) := λ x, by unfold bijective; apply_instance
 
 /-- Construct a proof of `fintype α` from a universal multiset -/
 def of_multiset [decidable_eq α] (s : multiset α)
@@ -454,6 +463,11 @@ begin
   simp [this], exact setoid.refl _
 end
 
+@[simp, to_additive finset.sum_attach_univ]
+lemma finset.prod_attach_univ [fintype α] [comm_monoid β] (f : {a : α // a ∈ @univ α _} → β) :
+  univ.attach.prod (λ x, f x) = univ.prod (λ x, f ⟨x, (mem_univ _)⟩) :=
+prod_bij (λ x _, x.1) (λ _ _, mem_univ _) (λ _ _ , by simp) (by simp) (λ b _, ⟨⟨b, mem_univ _⟩, by simp⟩)
+
 section equiv
 
 open list equiv equiv.perm
@@ -573,3 +587,4 @@ lemma fintype.card_equiv [fintype α] [fintype β] (e : α ≃ β) :
 fintype.card_congr (equiv_congr (equiv.refl α) e) ▸ fintype.card_perm
 
 end equiv
+

@@ -440,6 +440,22 @@ lim_eq_of_equiv_const $ show lim_zero (inv f hf - const abs (lim ⇑f)⁻¹),
       (by rw [← mul_assoc]; exact h₁ _ _ _),
   (lim_zero_congr h₂).mpr $ by rw mul_comm; exact mul_lim_zero _ (setoid.symm (equiv_lim f))
 
+lemma lim_le {f : cau_seq ℝ abs} {x : ℝ}
+  (h : f ≤ cau_seq.const abs x) : real.lim f ≤ x :=
+cau_seq.const_le.1 $ cau_seq.le_of_eq_of_le (setoid.symm (real.equiv_lim f)) h
+
+lemma le_lim {f : cau_seq ℝ abs} {x : ℝ}
+  (h : cau_seq.const abs x ≤ f) : x ≤ real.lim f :=
+cau_seq.const_le.1 $ cau_seq.le_of_le_of_eq h (real.equiv_lim f)
+
+lemma lt_lim {f : cau_seq ℝ abs} {x : ℝ}
+  (h : cau_seq.const abs x < f) : x < real.lim f :=
+cau_seq.const_lt.1 $ cau_seq.lt_of_lt_of_eq h (real.equiv_lim f)
+
+lemma lim_lt {f : cau_seq ℝ abs} {x : ℝ}
+  (h : f < cau_seq.const abs x) : real.lim f < x :=
+cau_seq.const_lt.1 $ cau_seq.lt_of_eq_of_lt (setoid.symm (real.equiv_lim f)) h
+
 end lim
 
 theorem sqrt_exists : ∀ {x : ℝ}, 0 ≤ x → ∃ y, 0 ≤ y ∧ y * y = x :=
@@ -572,7 +588,7 @@ by rw [mul_self_le_mul_self_iff (sqrt_nonneg _) (sqrt_nonneg _),
        mul_self_sqrt hx, mul_self_sqrt hy]
 
 @[simp] theorem sqrt_lt {x y : ℝ} (hx : 0 ≤ x) (hy : 0 ≤ y) : sqrt x < sqrt y ↔ x < y :=
-le_iff_le_iff_lt_iff_lt.1 (sqrt_le hy hx)
+lt_iff_lt_of_le_iff_le (sqrt_le hy hx)
 
 @[simp] theorem sqrt_inj {x y : ℝ} (hx : 0 ≤ x) (hy : 0 ≤ y) : sqrt x = sqrt y ↔ x = y :=
 by simp [le_antisymm_iff, hx, hy]
@@ -586,7 +602,7 @@ theorem sqrt_eq_zero' {x : ℝ} : sqrt x = 0 ↔ x ≤ 0 :=
   (λ h, by simp [h]; simp [le_antisymm_iff, h])
 
 @[simp] theorem sqrt_pos {x : ℝ} : 0 < sqrt x ↔ 0 < x :=
-le_iff_le_iff_lt_iff_lt.1 (iff.trans
+lt_iff_lt_of_le_iff_le (iff.trans
   (by simp [le_antisymm_iff, sqrt_nonneg]) sqrt_eq_zero')
 
 @[simp] theorem sqrt_mul' (x) {y : ℝ} (hy : 0 ≤ y) : sqrt (x * y) = sqrt x * sqrt y :=

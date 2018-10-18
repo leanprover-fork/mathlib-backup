@@ -32,7 +32,7 @@ by rw [← int.coe_nat_zero, coe_nat_inj']
 @[simp] theorem coe_nat_ne_zero {n : ℕ} : (n : ℤ) ≠ 0 ↔ n ≠ 0 :=
 not_congr coe_nat_eq_zero
 
-lemma coe_nat_nonneg (n : ℕ) : 0 ≤ (n : ℤ) := coe_nat_le.2 (zero_le _)
+lemma coe_nat_nonneg (n : ℕ) : 0 ≤ (n : ℤ) := coe_nat_le.2 (nat.zero_le _)
 
 lemma coe_nat_ne_zero_iff_pos {n : ℕ} : (n : ℤ) ≠ 0 ↔ 0 < n :=
 ⟨λ h, nat.pos_of_ne_zero (coe_nat_ne_zero.1 h),
@@ -82,7 +82,7 @@ theorem add_one_le_iff {a b : ℤ} : a + 1 ≤ b ↔ a < b := iff.rfl
 theorem lt_add_one_iff {a b : ℤ} : a < b + 1 ↔ a ≤ b :=
 @add_le_add_iff_right _ _ a b 1
 
-theorem sub_one_le_iff {a b : ℤ} : a - 1 < b ↔ a ≤ b :=
+theorem sub_one_lt_iff {a b : ℤ} : a - 1 < b ↔ a ≤ b :=
 sub_lt_iff_lt_add.trans lt_add_one_iff
 
 theorem le_sub_one_iff {a b : ℤ} : a ≤ b - 1 ↔ a < b :=
@@ -438,6 +438,16 @@ by have := mod_add_div a b; rwa [H, zero_add] at this
 theorem div_mul_cancel_of_mod_eq_zero {a b : ℤ} (H : a % b = 0) : a / b * b = a :=
 by rw [mul_comm, mul_div_cancel_of_mod_eq_zero H]
 
+lemma mod_two_eq_zero_or_one (n : ℤ) : n % 2 = 0 ∨ n % 2 = 1 :=
+have h : n % 2 < 2 := abs_of_nonneg (show (2 : ℤ) ≥ 0, from dec_trivial) ▸ int.mod_lt _ dec_trivial,
+have h₁ : n % 2 ≥ 0 := int.mod_nonneg _ dec_trivial,
+match (n % 2), h, h₁ with
+| (0 : ℕ) := λ _ _, or.inl rfl
+| (1 : ℕ) := λ _ _, or.inr rfl
+| (k + 2 : ℕ) := λ h _, absurd h dec_trivial
+| -[1+ a] := λ _ h₁, absurd h₁ dec_trivial
+end
+
 /- dvd -/
 
 theorem coe_nat_dvd {m n : ℕ} : (↑m : ℤ) ∣ ↑n ↔ m ∣ n :=
@@ -598,7 +608,7 @@ begin
       exact hdiv }
 end
 
-lemma dvd_of_pow_dvd {p k : ℕ} {m : ℤ} (hk : 1 ≤ k) (hpk : ↑(p^k) ∣ m) : ↑p ∣ m := 
+lemma dvd_of_pow_dvd {p k : ℕ} {m : ℤ} (hk : 1 ≤ k) (hpk : ↑(p^k) ∣ m) : ↑p ∣ m :=
 by rw ←nat.pow_one p; exact pow_dvd_of_le_of_pow_dvd hk hpk
 
 /- / and ordering -/
@@ -1067,6 +1077,8 @@ by cases n; simp [nat.mul_cast_comm, left_distrib, right_distrib, *]
 
 @[simp] theorem cast_bit1 [ring α] (n : ℤ) : ((bit1 n : ℤ) : α) = bit1 n :=
 by rw [bit1, cast_add, cast_one, cast_bit0]; refl
+
+lemma cast_two [ring α] : ((2 : ℤ) : α) = 2 := by simp
 
 theorem cast_nonneg [linear_ordered_ring α] : ∀ {n : ℤ}, (0 : α) ≤ n ↔ 0 ≤ n
 | (n : ℕ) := by simp
