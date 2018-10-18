@@ -17,15 +17,6 @@ open herm_inner_product_space
 noncomputable instance herm_to_module (V : Type u) [herm_inner_product_space V] : module ℂ V := 
 (herm_inner_product_space.to_vector_space V).to_module
 
---noncomputable instance herm_has_add (V : Type u) [herm_inner_product_space V] : has_add V :=
---⟨(herm_inner_product_space.to_vector_space V).to_module.to_add_comm_group.add⟩  
-
---noncomputable instance herm_has_scalar (V : Type u) [herm_inner_product_space V] : has_scalar ℂ V :=
---(herm_inner_product_space.to_vector_space V).to_module.to_has_scalar
-
---noncomputable instance herm_has_zero (V : Type u) [herm_inner_product_space V] : has_one V :=
---⟨(herm_inner_product_space.to_vector_space V).to_module.to_add_comm_group.zero⟩ 
-
 theorem is_anti_linear {V : Type u} [herm_inner_product_space V] : 
 ∀ (a b : ℂ), ∀ (x y z : V), x ∘ ((a • y) + (b • z)) = conj(a) * (x ∘ y) + conj(b) * (x ∘ z):=
 begin
@@ -100,7 +91,6 @@ x ∘ 0 = 0 := sesq_zero conj_is_invo x --by rw [is_conj_sym, conj_eq_zero, zero
 @[simp] lemma inprod_neg_right {V : Type u} [herm_inner_product_space V] (x y : V) : 
 x ∘ -y = -(x ∘ y) := sesq_neg_right conj_is_invo x y --by rw [←neg_one_smul, mul_antilin_right, conj_neg, conj_one, neg_one_mul]   
 
---instance complex.has_sub : has_sub ℂ := ⟨λ (x y : ℂ), x + -y⟩
 noncomputable instance complex.add_comm_group : add_comm_group ℂ := ring.to_add_comm_group ℂ  
 
 lemma inprod_sub_left {V : Type u} [herm_inner_product_space V] (x y z : V) : 
@@ -157,14 +147,6 @@ begin
 end
 
 lemma I_mul_self : I * I = -1 := complex.ext (mul_re I I) (mul_im I I)
-/-
-begin  
-apply complex.ext,
-  apply mul_re,
-
-  apply mul_im,
-end
--/
 
 lemma zero_pow {α : Type u} [ring α] (n : ℕ) (ha : n ≠ 0) : (0 : α)^n = (0 : α) :=
 begin
@@ -185,7 +167,6 @@ lemma im_add_mul_I (a b : ℝ) : (↑a + I * ↑b).im = b := by simp
 lemma ne_comm {α : Type u} {a b : α} : a ≠ b ↔ b ≠ a :=
 ⟨ λ H, iff_subst (@eq_comm _ a b) H, λ H, 
   iff_subst (@eq_comm _ b a) H⟩ 
-
 
 lemma pow_eq_zero {α : Type u} [field α] {a : α} {n : ℕ} : a^n = 0 → a = 0 :=
 begin
@@ -266,7 +247,7 @@ lemma herm_norm_sqr {V : Type u} [herm_inner_product_space V] (x : V) :
 |x|^2 = (x ∘ x).re := by rw pow_two; exact mul_self_herm_norm x
 
 open classical
-set_option trace.simplify.rewrite true
+
 theorem cauchy_schwarz_innequality {V : Type u} [herm_inner_product_space V] (x y : V) :
 abs((x ∘ y)) ≤ |x|*|y| := 
 begin
@@ -637,9 +618,6 @@ noncomputable instance normed_space.to_module {W : Type v} {F : Type u} [normed_
 @[simp] lemma herm_norm_smul_I {V : Type u} [herm_inner_product_space V] (x : V) :
 |I • x| = |x| := by simp
 
---@[simp] lemma norm_zero {G : Type*} [normed_group G] : 
---∥(0 : G)∥ = 0 := by simp 
-
 lemma norm_ne_zero_iff_ne_zero {G : Type*} [normed_group G] {g : G} : 
 ∥g∥ ≠ 0 ↔ g ≠ 0 := 
 ⟨ λ H, (iff_false_left H).mp (norm_eq_zero g), 
@@ -959,42 +937,3 @@ class Hilbert_space (V : Type u) extends herm_inner_product_space V :=
 
 instance Hilbert_space.to_complete_space (V : Type u) [Hilbert_space V] : complete_space V :=
 {complete := @Hilbert_space.complete V _}
-
-noncomputable instance complex.to_module : module ℂ ℂ := ring.to_module 
-
-noncomputable instance complex.to_vector_space : vector_space ℂ ℂ := {..complex.to_module} 
-
-noncomputable instance complex.to_herm_inner_product_space : herm_inner_product_space ℂ :=
-⟨ λ x y : ℂ, x * conj y,
-  begin intros, simp, ring, end,
-  begin intros, rw conj_mul, rw conj_conj, rw field.mul_comm, end,
-  begin 
-    intros, 
-    split,
-    rw mul_conj,
-    rw of_real_re,
-    exact norm_sq_nonneg x,
-
-    rw mul_conj,
-    rw ←of_real_zero,
-    rw of_real_inj,
-    exact norm_sq_eq_zero,   
-  end⟩
-
-lemma continuous_re : continuous re := 
-begin 
-unfold continuous,
-unfold is_open,
-unfold set.preimage, 
-intros s H,
- 
-end 
-
-instance complex.to_Hilbert_space : Hilbert_space ℂ :=
-⟨⟩
-
-#check real.complete_space
-#check complex.to_normed_field
-#check complex.to_metric_space
-#check real.metric_space
-#print subsingleton
