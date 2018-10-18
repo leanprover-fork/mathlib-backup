@@ -613,7 +613,7 @@ normed_space ℂ V :=
 noncomputable instance normed_space.to_module {W : Type v} {F : Type u} [normed_field F] [normed_space F W] : module F W := (normed_space.to_vector_space W).to_module
 
 @[simp] lemma herm_norm_zero {V : Type u} [herm_inner_product_space V] : 
-|(0 : V)| = 0 := @norm_zero V _--norm_eq_zero.mpr (refl (0 : V))
+|(0 : V)| = 0 := @norm_zero V _
 
 @[simp] lemma herm_norm_smul_I {V : Type u} [herm_inner_product_space V] (x : V) :
 |I • x| = |x| := by simp
