@@ -610,7 +610,7 @@ normed_space ℂ V :=
   dist_eq := by intros; refl,
   norm_smul := herm_norm_smul}
 
-noncomputable instance normed_space.to_module {W : Type v} {F : Type u} [normed_field F] [normed_space F W] : module F W := (normed_space.to_vector_space W).to_module
+instance normed_space.to_module {W : Type v} {F : Type u} [normed_field F] [normed_space F W] : module F W := (normed_space.to_vector_space W).to_module
 
 @[simp] lemma herm_norm_zero {V : Type u} [herm_inner_product_space V] : 
 |(0 : V)| = 0 := @norm_zero V _
@@ -920,16 +920,6 @@ begin
     rw Ha,
     rw smul_proj,
     rw proj_self_eq_self, 
-end
-
-theorem exists_ortho_basis {V :Type u} [herm_inner_product_space V] :
-∃ S : set V, is_basis S ∧ is_orthonormal_set S := 
-begin
-  have H : ∃ S : set V, is_basis S,
-    exact exists_is_basis V,
-  apply exists.elim H,
-  intros A H, 
-  admit,
 end
 
 class Hilbert_space (V : Type u) extends herm_inner_product_space V :=
