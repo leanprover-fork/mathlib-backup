@@ -170,7 +170,7 @@ complex.of_real_mul : ∀ (r s : ℝ), ↑(r * s) = ↑r * ↑s
 
 This lemma is in the `complex` namespace, but it is about coercions *to* the complexes from the reals. Writing code by hand is full of pitfalls like this? Why is this? Is this just poor design? No, it's much more complicated than this. The problem is that the coercions from `nat` to `int`, and from `real` to `complex` are *not* defined as special cases of generic coercions from `nat` to a general semiring or from `real` to a general complete field -- mathlib's designers made a conscious decision to use other more computationally efficient coercions, hence the confusion. The designers are not bothered by this, because `simp` works!
 
-Hopefully the example I gave above was sufficiently convoluted that if you really want to know the exact names of the lemmas you need, you can start to guess. Here's a brief selection:
+Hopefully the example I gave above was sufficiently convoluted that if you really want to know the exact names of the lemmas you need, you can start to guess. Here's a brief selection. Because there are so many special cases, this can be a bit of a minefield.
 
 ```
 coercions commute with multiplication:
