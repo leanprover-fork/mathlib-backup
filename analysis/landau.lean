@@ -1,12 +1,6 @@
-import order.filter
-import algebra.field
-import analysis.topology.topological_space
-import analysis.normed_space
-import tactic.find
-import linear_algebra
 import analysis.bounded_linear_maps
-open classical finset function filter
-local attribute [instance] prop_decidable
+open classical filter
+local attribute [instance, priority 0] prop_decidable
 
 noncomputable theory
 
@@ -18,12 +12,11 @@ def littleo (F : set (set α)) (f : α → β) (e : α → γ) :=
 
 lemma littleo0 (F : filter α) (e : α → γ) : littleo (sets F) (0 : α → β) e :=
 begin
-  intros ε ε_gt0, simp,
+  intros ε ε_gt0,
+  suffices : F.sets {x : α | 0 ≤ ε * ∥e x∥}, by simp [this],
   apply univ_mem_sets',
-  intros a, simp,
-  apply mul_nonneg,
-  {linarith},
-  {apply norm_nonneg}
+  intros a, 
+  exact mul_nonneg (by linarith) (norm_nonneg _)
 end
 
 def mklittleo (F : set (set α)) (f : α → β) (e : α → γ) :=
@@ -39,10 +32,8 @@ begin
   split, swap, { exact assume ofg, ⟨f - g, ofg⟩ },
   { rintro ⟨h, eq_h⟩,
     rw [mklittleo] at eq_h,
-    by_cases h_littleo : littleo (sets F) h e,
-    {rw [if_pos h_littleo] at eq_h, simp [eq_h, mklittleo, if_pos h_littleo]},
-    {simp [if_neg h_littleo] at eq_h, simp [eq_h, if_pos littleo0]}
-   }
+    by_cases h_littleo : littleo (sets F) h e ;
+    simp [h_littleo] at eq_h ; simp [eq_h, mklittleo, h_littleo] }
 end
 
 /- 
