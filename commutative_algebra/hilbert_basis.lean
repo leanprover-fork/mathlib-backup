@@ -62,6 +62,14 @@ show option.get_or_else (degree p) 0 ≤ n, from match degree p, H with
 | (some d), H := with_bot.coe_le_coe.1 H
 end
 
+theorem leading_coeff_mul_X_pow {p : polynomial R} {n : ℕ} :
+  leading_coeff (p * X ^ n) = leading_coeff p :=
+decidable.by_cases
+  (assume H : leading_coeff p = 0, by rw [H, leading_coeff_eq_zero.1 H, zero_mul, leading_coeff_zero])
+  (assume H : leading_coeff p ≠ 0,
+    by rw [leading_coeff_mul', leading_coeff_X_pow, mul_one];
+       rwa [leading_coeff_X_pow, mul_one])
+
 end
 
 variables (R : Type u) [comm_ring R] [decidable_eq R]
@@ -119,44 +127,32 @@ begin
     { rw [leading_coeff, ← coeff_mul_X_pow p (n - nat_degree p), this] } }
 end
 
+theorem leading_coeff_nth_mono {m n : ℕ} (H : m ≤ n) :
+  I.leading_coeff_nth m ≤ I.leading_coeff_nth n :=
+begin
+  intros r hr,
+  simp only [submodule.mem_coe, mem_leading_coeff_nth] at hr ⊢,
+  rcases hr with ⟨p, hpI, hpdeg, rfl⟩,
+  refine ⟨p * X ^ (n - m), I.mul_mem_right hpI, _, leading_coeff_mul_X_pow⟩,
+  refine le_trans (degree_mul_le _ _) _,
+  refine le_trans (add_le_add' hpdeg (degree_X_pow_le _)) _,
+  rw [← with_bot.coe_add, nat.add_sub_cancel' H],
+  exact le_refl _
+end
+
 def leading_coeff : ideal R :=
-⨆ n : ℕ, submodule.map ((coeff_is_linear n).mk' _) $
-  degree_le R n ⊓ I.of_polynomial
+⨆ n : ℕ, I.leading_coeff_nth n
 
 theorem mem_leading_coeff (x) :
   x ∈ I.leading_coeff ↔ ∃ p ∈ I, polynomial.leading_coeff p = x :=
 begin
   rw [leading_coeff, submodule.mem_supr_of_directed],
-  simp only [submodule.mem_coe, submodule.mem_map, is_linear_map.mk'_apply, submodule.mem_inf, mem_degree_le],
-  { split,
-    { rintro ⟨i, y, ⟨hydeg, hyI⟩, rfl⟩,
-      cases lt_or_eq_of_le hydeg with hydeg hydeg,
-      { refine ⟨0, I.zero_mem, _⟩,
-        rw [leading_coeff_zero, eq_comm],
-         exact coeff_eq_zero_of_degree_lt hydeg },
-      { refine ⟨y, hyI, _⟩,
-        rw [polynomial.leading_coeff, nat_degree, hydeg], refl } },
-    { rintro ⟨p, hpI, hpx⟩,
-      exact ⟨p.nat_degree, p, ⟨degree_le_nat_degree, hpI⟩, hpx⟩ } },
+  simp only [mem_leading_coeff_nth],
+  { split, { rintro ⟨i, p, hpI, hpdeg, rfl⟩, exact ⟨p, hpI, rfl⟩ },
+    rintro ⟨p, hpI, rfl⟩, exact ⟨nat_degree p, p, hpI, degree_le_nat_degree, rfl⟩ },
   { exact ⟨0⟩ },
-  intros i j, existsi i + j, split,
-  { intros r hr,
-    erw [submodule.mem_map] at hr ⊢,
-    simp only [is_linear_map.mk'_apply, submodule.mem_inf, mem_degree_le] at hr ⊢,
-    rcases hr with ⟨p, ⟨hpdeg, hpI⟩, rfl⟩,
-    refine ⟨p * X ^ j, ⟨_, I.mul_mem_right hpI⟩, _⟩,
-    { refine le_trans (degree_mul_le _ _) _,
-      exact add_le_add' hpdeg (degree_X_pow_le j) },
-    { rw coeff_mul_X_pow } },
-  { intros r hr,
-    erw [submodule.mem_map] at hr ⊢,
-    simp only [is_linear_map.mk'_apply, submodule.mem_inf, mem_degree_le] at hr ⊢,
-    rcases hr with ⟨p, ⟨hpdeg, hpI⟩, rfl⟩,
-    refine ⟨p * X ^ i, ⟨_, I.mul_mem_right hpI⟩, _⟩,
-    { refine le_trans (degree_mul_le _ _) _,
-      rw add_comm i j,
-      exact add_le_add' hpdeg (degree_X_pow_le i) },
-    { rw [add_comm, coeff_mul_X_pow] } }
+  intros i j, exact ⟨i + j, I.leading_coeff_nth_mono (nat.le_add_right _ _),
+    I.leading_coeff_nth_mono (nat.le_add_left _ _)⟩
 end
 
 end ideal
