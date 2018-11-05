@@ -8,7 +8,7 @@ universes u v w
 def module_of_module_of_ring_hom {R : Type u} [ring R]
   {S : Type v} [ring S] (f : R → S) [is_ring_hom f]
   {M : Type w} [add_comm_group M] [module S M] : module R M :=
-module.of_core { 
+module.of_core {
   smul := λ r m, f r • m,
   smul_add := λ r, smul_add _,
   add_smul := λ r s x, show f (r + s) • x = _,
@@ -33,8 +33,10 @@ end
 
 namespace polynomial
 
-def deg_le_iff_coeff_zero {R : Type u} [comm_semiring R] [decidable_eq R]
-  (f : polynomial R) (n : with_bot ℕ) :
+section
+variables {R : Type u} [comm_semiring R] [decidable_eq R]
+
+def deg_le_iff_coeff_zero (f : polynomial R) (n : with_bot ℕ) :
   degree f ≤ n ↔ ∀ m : ℕ, n < m → coeff f m = 0 :=
 ⟨λ (H : finset.sup (f.support) some ≤ n) m (Hm : n < (m : with_bot ℕ)), decidable.of_not_not $ λ H4,
   have H1 : m ∉ f.support,
@@ -42,6 +44,18 @@ def deg_le_iff_coeff_zero {R : Type u} [comm_semiring R] [decidable_eq R]
   H1 $ (finsupp.mem_support_to_fun f m).2 H4,
 λ H, finset.sup_le $ λ b Hb, decidable.of_not_not $ λ Hn,
   (finsupp.mem_support_to_fun f b).1 Hb $ H b $ lt_of_not_ge Hn⟩
+
+theorem deg_C_mul_X_pow_le (r : R) (n : ℕ) : degree (C r * X^n : polynomial R) ≤ n :=
+by rw [← single_eq_C_mul_X]; exact finset.sup_le (λ b hb,
+by rw list.eq_of_mem_singleton (finsupp.support_single_subset hb); exact le_refl _)
+
+theorem deg_X_pow_le (n : ℕ) : degree (X^n : polynomial R) ≤ n :=
+by simpa only [C_1, one_mul] using deg_C_mul_X_pow_le (1:R) n
+
+theorem deg_X_le (n : ℕ) : degree (X : polynomial R) ≤ 1 :=
+by simpa only [C_1, one_mul, pow_one] using deg_C_mul_X_pow_le (1:R) 1
+
+end
 
 variables (R : Type u) [comm_ring R] [decidable_eq R]
 
@@ -96,7 +110,7 @@ begin
     rcases hr with ⟨p, ⟨hpdeg, hpI⟩, rfl⟩,
     refine ⟨p * polynomial.X ^ j, ⟨_, I.mul_mem_right hpI⟩, _⟩,
     { refine le_trans (polynomial.degree_mul_le _ _) _,
-      sorry },
+      exact add_le_add' hpdeg (polynomial.deg_X_pow_le j) },
     { rw polynomial.coeff_mul_X_pow } },
   { intros r hr,
     erw [submodule.mem_map] at hr ⊢,
@@ -104,6 +118,7 @@ begin
     rcases hr with ⟨p, ⟨hpdeg, hpI⟩, rfl⟩,
     refine ⟨p * polynomial.X ^ i, ⟨_, I.mul_mem_right hpI⟩, _⟩,
     { refine le_trans (polynomial.degree_mul_le _ _) _,
-      sorry },
+      rw add_comm i j,
+      exact add_le_add' hpdeg (polynomial.deg_X_pow_le i) },
     { rw [add_comm, polynomial.coeff_mul_X_pow] } }
 end
