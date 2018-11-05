@@ -78,27 +78,28 @@ by simp only [degree_le, submodule.mem_infi, degree_le_iff_coeff_zero, linear_ma
 
 end polynomial
 
+namespace ideal
 open polynomial
 
 variables {R : Type u} [comm_ring R] [decidable_eq R]
 variable (I : ideal (polynomial R))
 
-def ideal.of_polynomial : submodule R (polynomial R) :=
+def of_polynomial : submodule R (polynomial R) :=
 { carrier := (@submodule.carrier (polynomial R) (polynomial R) _ _ ring.to_module I : set (polynomial R)),
   zero := I.zero_mem,
   add := λ _ _, I.add_mem,
   smul := λ c x H, by rw [← C_mul'];
     exact @submodule.smul_mem (polynomial R) (polynomial R) _ _ ring.to_module _ _ _ H }
 
-theorem ideal.mem_of_polynomial (x) : x ∈ I.of_polynomial ↔ x ∈ I := iff.rfl
+theorem mem_of_polynomial (x) : x ∈ I.of_polynomial ↔ x ∈ I := iff.rfl
 
-def ideal.leading_coeff_nth (n : ℕ) : ideal R :=
+def leading_coeff_nth (n : ℕ) : ideal R :=
 (degree_le R n ⊓ I.of_polynomial).map $ lcoeff R n
 
-theorem ideal.mem_leading_coeff_nth (n : ℕ) (x) :
+theorem mem_leading_coeff_nth (n : ℕ) (x) :
   x ∈ I.leading_coeff_nth n ↔ ∃ p ∈ I, degree p ≤ n ∧ leading_coeff p = x :=
 begin
-  simp only [ideal.leading_coeff_nth, submodule.mem_map, lcoeff_apply, submodule.mem_inf, mem_degree_le],
+  simp only [leading_coeff_nth, submodule.mem_map, lcoeff_apply, submodule.mem_inf, mem_degree_le],
   split,
   { rintro ⟨p, ⟨hpdeg, hpI⟩, rfl⟩,
     cases lt_or_eq_of_le hpdeg with hpdeg hpdeg,
@@ -118,14 +119,14 @@ begin
     { rw [leading_coeff, ← coeff_mul_X_pow p (n - nat_degree p), this] } }
 end
 
-def ideal.leading_coeff : ideal R :=
+def leading_coeff : ideal R :=
 ⨆ n : ℕ, submodule.map ((coeff_is_linear n).mk' _) $
   degree_le R n ⊓ I.of_polynomial
 
-theorem ideal.mem_leading_coeff (x) :
-  x ∈ I.leading_coeff ↔ ∃ p ∈ I, leading_coeff p = x :=
+theorem mem_leading_coeff (x) :
+  x ∈ I.leading_coeff ↔ ∃ p ∈ I, polynomial.leading_coeff p = x :=
 begin
-  rw [ideal.leading_coeff, submodule.mem_supr_of_directed],
+  rw [leading_coeff, submodule.mem_supr_of_directed],
   simp only [submodule.mem_coe, submodule.mem_map, is_linear_map.mk'_apply, submodule.mem_inf, mem_degree_le],
   { split,
     { rintro ⟨i, y, ⟨hydeg, hyI⟩, rfl⟩,
@@ -134,7 +135,7 @@ begin
         rw [leading_coeff_zero, eq_comm],
          exact coeff_eq_zero_of_degree_lt hydeg },
       { refine ⟨y, hyI, _⟩,
-        rw [leading_coeff, nat_degree, hydeg], refl } },
+        rw [polynomial.leading_coeff, nat_degree, hydeg], refl } },
     { rintro ⟨p, hpI, hpx⟩,
       exact ⟨p.nat_degree, p, ⟨degree_le_nat_degree, hpI⟩, hpx⟩ } },
   { exact ⟨0⟩ },
@@ -157,6 +158,8 @@ begin
       exact add_le_add' hpdeg (degree_X_pow_le i) },
     { rw [add_comm, coeff_mul_X_pow] } }
 end
+
+end ideal
 
 /-theorem hilbert_basis (hn : is_noetherian_ring R) : is_noetherian_ring (polynomial R) :=
 assume I : ideal (polynomial R),
