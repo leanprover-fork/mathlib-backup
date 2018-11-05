@@ -86,10 +86,11 @@ by simp only [degree_le, submodule.mem_infi, degree_le_iff_coeff_zero, linear_ma
 
 end polynomial
 
+variables {R : Type u} [comm_ring R] [decidable_eq R]
+
 namespace ideal
 open polynomial
 
-variables {R : Type u} [comm_ring R] [decidable_eq R]
 variable (I : ideal (polynomial R))
 
 def of_polynomial : submodule R (polynomial R) :=
@@ -157,10 +158,27 @@ end
 
 end ideal
 
-/-theorem hilbert_basis (hn : is_noetherian_ring R) : is_noetherian_ring (polynomial R) :=
+theorem hilbert_basis (hnr : is_noetherian_ring R) : is_noetherian_ring (polynomial R) :=
 assume I : ideal (polynomial R),
 let L := I.leading_coeff in
-_-/
+let M := well_founded.min (is_noetherian_iff_well_founded.1 hnr)
+  (set.range I.leading_coeff_nth) (set.ne_empty_of_mem ⟨0, rfl⟩) in
+have hm : M ∈ set.range I.leading_coeff_nth := well_founded.min_mem _ _ _,
+let ⟨N, HN⟩ := hm in
+have gen' : ∀ n, ∃ s : finset (polynomial R), (↑s : set (polynomial R)) ⊆ ↑I ∧
+  (∀ x ∈ s, polynomial.degree x ≤ ↑n) ∧
+  submodule.span (polynomial.lcoeff R n '' ↑s) = ideal.leading_coeff_nth I n := sorry,
+let ⟨gen, hgen⟩ := classical.skolem.1 gen' in
+⟨finset.bind (finset.range (N+1)) gen,
+le_antisymm (ideal.span_le.2 $ λ p hp, let ⟨n, hnN, hpn⟩ := finset.mem_bind.1 hp in (hgen n).1 hpn) $
+λ p hpI, begin
+  generalize h : p.nat_degree = n,
+  induction n using nat.strong_induction_on with n ih,
+  sorry
+end⟩
 
 #check is_noetherian_iff_well_founded
 #check well_founded.min
+#check well_founded.min_mem
+#check well_founded.not_lt_min
+#check classical.skolem
