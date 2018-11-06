@@ -58,8 +58,15 @@ by simpa only [C_1, one_mul, pow_one] using degree_C_mul_X_pow_le (1:R) 1
 theorem nat_degree_le_of_degree_le {p : polynomial R} {n : ℕ}
   (H : degree p ≤ n) : nat_degree p ≤ n :=
 show option.get_or_else (degree p) 0 ≤ n, from match degree p, H with
-| none, H := zero_le _
+| none,     H := zero_le _
 | (some d), H := with_bot.coe_le_coe.1 H
+end
+
+theorem with_bot.le_of_lt_succ {k : with_bot ℕ} {n : ℕ}
+  (h : k < n+1) : k ≤ n :=
+match k, h with
+| none,     h := lattice.bot_le
+| (some d), h := with_bot.coe_le_coe.2 (nat.le_of_lt_succ (with_bot.coe_lt_coe.1 h))
 end
 
 theorem leading_coeff_mul_X_pow {p : polynomial R} {n : ℕ} :
@@ -69,6 +76,21 @@ decidable.by_cases
   (assume H : leading_coeff p ≠ 0,
     by rw [leading_coeff_mul', leading_coeff_X_pow, mul_one];
        rwa [leading_coeff_X_pow, mul_one])
+
+theorem exists_eq_add_C_leading_coeff_mul_X_pow_nat_degree {p : polynomial R} (H : p ≠ 0) :
+  ∃ q : polynomial R, p = q + C (leading_coeff p) * X ^ (nat_degree p) ∧ degree q < degree p :=
+⟨finsupp.erase (nat_degree p) p,
+  by rw [← single_eq_C_mul_X]; exact finsupp.erase_add_single.symm,
+  degree_erase_lt H⟩
+
+theorem exists_eq_add_C_leading_coeff_mul_X_pow_of_nat_degree_le {p : polynomial R} (H : p ≠ 0)
+  (n : ℕ) (hn : nat_degree p ≤ n) :
+  ∃ q : polynomial R, p = q + C (coeff p n) * X ^ n ∧ degree q < n :=
+or.cases_on (lt_or_eq_of_le hn)
+  (λ h, have degree p < n := lt_of_le_of_lt degree_le_nat_degree (with_bot.coe_lt_coe.2 h),
+    ⟨p, by rw [coeff_eq_zero_of_degree_lt this, C_0, zero_mul, add_zero], this⟩)
+  (λ h, by rw [← h, ← degree_eq_nat_degree H];
+    exact exists_eq_add_C_leading_coeff_mul_X_pow_nat_degree H)
 
 end
 
@@ -83,6 +105,29 @@ variable {R}
 theorem mem_degree_le {n : with_bot ℕ} {f : polynomial R} :
   f ∈ degree_le R n ↔ degree f ≤ n :=
 by simp only [degree_le, submodule.mem_infi, degree_le_iff_coeff_zero, linear_map.mem_ker]; refl
+
+theorem degree_le_eq_span_X_pow {n : ℕ} :
+  degree_le R n = submodule.span ↑((finset.range (n+1)).image (λ n, X^n) : finset (polynomial R)) :=
+begin
+  apply le_antisymm,
+  { intros p hp, replace hp := mem_degree_le.1 hp,
+    induction n with n ih generalizing p,
+    { rw submodule.mem_coe,
+      change p ∈ submodule.span ↑(finset.image (λ n, X^n) (finset.singleton 0 : finset ℕ)),
+      rw [eq_C_of_degree_le_zero hp, finset.image_singleton, finset.coe_singleton, submodule.mem_span_singleton],
+      existsi coeff p 0,
+      rw [← C_mul', pow_zero, mul_one] },
+    by_cases hp0 : p = 0, { rw hp0, exact (submodule.mem_coe _).2 (submodule.zero_mem _) },
+    rcases exists_eq_add_C_leading_coeff_mul_X_pow_of_nat_degree_le hp0 n.succ (nat_degree_le_of_degree_le hp) with ⟨q, hpq, hdq⟩,
+    rw [finset.range_succ, finset.image_insert, finset.coe_insert, set.insert_eq, submodule.span_union],
+    rw [submodule.mem_coe, hpq, submodule.mem_sup, C_mul'],
+    refine ⟨_, _, _, _, add_comm _ _⟩,
+    { rw submodule.mem_span_singleton, exact ⟨_, rfl⟩ },
+    exact ih (with_bot.le_of_lt_succ hdq) },
+  rw [submodule.span_le, finset.coe_image, set.image_subset_iff],
+  intros k hk, apply mem_degree_le.2,
+  apply le_trans (degree_X_pow_le _) (with_bot.coe_le_coe.2 $ nat.le_of_lt_succ $ finset.mem_range.1 hk)
+end
 
 end polynomial
 
