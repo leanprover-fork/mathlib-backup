@@ -5,32 +5,6 @@ import data.polynomial
 
 universes u v w
 
-def module_of_module_of_ring_hom {R : Type u} [ring R]
-  {S : Type v} [ring S] (f : R → S) [is_ring_hom f]
-  {M : Type w} [add_comm_group M] [module S M] : module R M :=
-module.of_core {
-  smul := λ r m, f r • m,
-  smul_add := λ r, smul_add _,
-  add_smul := λ r s x, show f (r + s) • x = _,
-    by rw [is_ring_hom.map_add f, add_smul],
-  mul_smul := λ r s x, show f (r * s) • x = _,
-    by rw [is_ring_hom.map_mul f, mul_smul],
-  one_smul := λ x, show f 1 • x = _,
-    by rw [is_ring_hom.map_one f, one_smul],
-}
-
-section
-local attribute [instance] module_of_module_of_ring_hom
-def submodule_of_submodule_of_ring_hom {R : Type u} [ring R]
-  {S : Type v} [ring S] (f : R → S) [is_ring_hom f]
-  {M : Type w} [add_comm_group M] [module S M]
-  (N : submodule S M) : submodule R M :=
-{ carrier := N.carrier,
-  zero := N.zero_mem,
-  add := λ _ _, N.add_mem,
-  smul := λ c x, N.smul_mem (f c) }
-end
-
 namespace polynomial
 
 section
@@ -62,13 +36,6 @@ show option.get_or_else (degree p) 0 ≤ n, from match degree p, H with
 | (some d), H := with_bot.coe_le_coe.1 H
 end
 
-theorem with_bot.le_of_lt_succ {k : with_bot ℕ} {n : ℕ}
-  (h : k < n+1) : k ≤ n :=
-match k, h with
-| none,     h := lattice.bot_le
-| (some d), h := with_bot.coe_le_coe.2 (nat.le_of_lt_succ (with_bot.coe_lt_coe.1 h))
-end
-
 theorem leading_coeff_mul_X_pow {p : polynomial R} {n : ℕ} :
   leading_coeff (p * X ^ n) = leading_coeff p :=
 decidable.by_cases
@@ -76,21 +43,6 @@ decidable.by_cases
   (assume H : leading_coeff p ≠ 0,
     by rw [leading_coeff_mul', leading_coeff_X_pow, mul_one];
        rwa [leading_coeff_X_pow, mul_one])
-
-theorem exists_eq_add_C_leading_coeff_mul_X_pow_nat_degree {p : polynomial R} (H : p ≠ 0) :
-  ∃ q : polynomial R, p = q + C (leading_coeff p) * X ^ (nat_degree p) ∧ degree q < degree p :=
-⟨finsupp.erase (nat_degree p) p,
-  by rw [← single_eq_C_mul_X]; exact finsupp.erase_add_single.symm,
-  degree_erase_lt H⟩
-
-theorem exists_eq_add_C_leading_coeff_mul_X_pow_of_nat_degree_le {p : polynomial R} (H : p ≠ 0)
-  (n : ℕ) (hn : nat_degree p ≤ n) :
-  ∃ q : polynomial R, p = q + C (coeff p n) * X ^ n ∧ degree q < n :=
-or.cases_on (lt_or_eq_of_le hn)
-  (λ h, have degree p < n := lt_of_le_of_lt degree_le_nat_degree (with_bot.coe_lt_coe.2 h),
-    ⟨p, by rw [coeff_eq_zero_of_degree_lt this, C_0, zero_mul, add_zero], this⟩)
-  (λ h, by rw [← h, ← degree_eq_nat_degree H];
-    exact exists_eq_add_C_leading_coeff_mul_X_pow_nat_degree H)
 
 end
 
@@ -111,19 +63,12 @@ theorem degree_le_eq_span_X_pow {n : ℕ} :
 begin
   apply le_antisymm,
   { intros p hp, replace hp := mem_degree_le.1 hp,
-    induction n with n ih generalizing p,
-    { rw submodule.mem_coe,
-      change p ∈ submodule.span ↑(finset.image (λ n, X^n) (finset.singleton 0 : finset ℕ)),
-      rw [eq_C_of_degree_le_zero hp, finset.image_singleton, finset.coe_singleton, submodule.mem_span_singleton],
-      existsi coeff p 0,
-      rw [← C_mul', pow_zero, mul_one] },
-    by_cases hp0 : p = 0, { rw hp0, exact (submodule.mem_coe _).2 (submodule.zero_mem _) },
-    rcases exists_eq_add_C_leading_coeff_mul_X_pow_of_nat_degree_le hp0 n.succ (nat_degree_le_of_degree_le hp) with ⟨q, hpq, hdq⟩,
-    rw [finset.range_succ, finset.image_insert, finset.coe_insert, set.insert_eq, submodule.span_union],
-    rw [submodule.mem_coe, hpq, submodule.mem_sup, C_mul'],
-    refine ⟨_, _, _, _, add_comm _ _⟩,
-    { rw submodule.mem_span_singleton, exact ⟨_, rfl⟩ },
-    exact ih (with_bot.le_of_lt_succ hdq) },
+    rw [← finsupp.sum_single p, finsupp.sum, submodule.mem_coe],
+    refine submodule.sum_mem _ (λ k hk, _),
+    have := with_bot.coe_le_coe.1 (finset.sup_le_iff.1 hp k hk),
+    rw [single_eq_C_mul_X, C_mul'],
+    refine submodule.smul_mem _ _ (submodule.subset_span $ finset.mem_coe.2 $
+      finset.mem_image.2 ⟨_, finset.mem_range.2 (nat.lt_succ_of_le this), rfl⟩) },
   rw [submodule.span_le, finset.coe_image, set.image_subset_iff],
   intros k hk, apply mem_degree_le.2,
   apply le_trans (degree_X_pow_le _) (with_bot.coe_le_coe.2 $ nat.le_of_lt_succ $ finset.mem_range.1 hk)
@@ -232,20 +177,16 @@ have hm2 : ∀ k, I.leading_coeff_nth k ≤ M := λ k, or.cases_on (le_or_lt k N
     have ¬M < I.leading_coeff_nth k, by refine well_founded.not_lt_min
       (is_noetherian_iff_well_founded.1 hnr) _ _ _; exact ⟨k, rfl⟩,
     this ⟨HN ▸ I.leading_coeff_nth_mono (le_of_lt h), λ H, hxm (H hx)⟩),
+have hs2 : ∀ {x}, x ∈ I.degree_le N → x ∈ ideal.span (↑s : set (polynomial R)),
+from hs ▸ λ x hx, submodule.span_induction hx (λ _ hx, ideal.subset_span hx) (ideal.zero_mem _)
+  (λ _ _, ideal.add_mem _) (λ c f hf, f.C_mul' c ▸ ideal.mul_mem_left _ hf),
 ⟨s, le_antisymm (ideal.span_le.2 $ λ x hx, have x ∈ I.degree_le N, from hs ▸ submodule.subset_span hx, this.2) $ begin
+  change I ≤ ideal.span ↑s,
   intros p hp, generalize hn : p.nat_degree = k,
   induction k using nat.strong_induction_on with k ih generalizing p,
   cases le_or_lt k N,
-  { subst k,
-    have : p ∈ I.degree_le N,
-    { exact ⟨polynomial.mem_degree_le.2 (le_trans polynomial.degree_le_nat_degree $ with_bot.coe_le_coe.2 h), hp⟩ },
-    rw ← hs at this,
-    apply submodule.span_induction this,
-    { exact λ _ hx, ideal.subset_span hx },
-    { exact (ideal.span ↑s).zero_mem },
-    { exact λ _ _ h1 h2, (ideal.span ↑s).add_mem h1 h2 },
-    { intros c f hf, rw ← polynomial.C_mul',
-      exact (ideal.span ↑s).mul_mem_left hf } },
+  { subst k, refine hs2 ⟨polynomial.mem_degree_le.2
+      (le_trans polynomial.degree_le_nat_degree $ with_bot.coe_le_coe.2 h), hp⟩ },
   { have hp0 : p ≠ 0,
     { rintro rfl, cases hn, exact nat.not_lt_zero _ h },
     have : (0 : R) ≠ 1,
@@ -278,6 +219,5 @@ have hm2 : ∀ k, I.leading_coeff_nth k ≤ M := λ k, or.cases_on (le_or_lt k N
       { rw hpq, exact ideal.zero_mem _ },
       refine ih _ _ (I.sub_mem hp (I.mul_mem_right hq)) rfl,
       rwa [polynomial.degree_eq_nat_degree hpq, with_bot.coe_lt_coe, hn] at this },
-    rw [polynomial.degree_eq_nat_degree hq0, with_bot.coe_le_coe] at hdq,
-    exact ih _ (lt_of_le_of_lt hdq h) hq rfl }
+    exact hs2 ⟨polynomial.mem_degree_le.2 hdq, hq⟩ }
 end⟩

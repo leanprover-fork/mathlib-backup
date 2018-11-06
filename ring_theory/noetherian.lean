@@ -40,22 +40,6 @@ variables {f : β →ₗ γ}
 theorem fg_map {s : submodule α β} (hs : s.fg) : (s.map f).fg :=
 let ⟨t, ht⟩ := fg_def.1 hs in fg_def.2 ⟨f '' t, finite_image _ ht.1, by rw [span_image, ht.2]⟩
 
-/-#check linear_map.comap_map_eq_self
-theorem fg_map_iff (hker : f.ker = ⊥) {s : submodule α β} :
-  (s.map f).fg ↔ s.fg :=
-⟨λ hs, let ⟨t, ht⟩ := fg_def.1 hs in begin
-  haveI := classical.dec,
-  have : ∀ y ∈ t, ∃ x, x ∈ s ∧ f x = y,
-  { intros y hy, rw [← mem_map, ← ht.2], exact subset_span hy },
-  have : ∃ g : γ → β, ∀ y ∈ t, g y ∈ s ∧ f (g y) = y,
-  { choose g hg, existsi λ y, if H : y ∈ t then g y H else 0,
-    intros y hy, simp only [dif_pos hy], apply hg },
-  cases this with g hg, clear this,
-end, fg_map⟩-/
-/-
-g : Π (y : γ), y ∈ t → β,
-hg : ∀ (y : γ) (H : y ∈ t), g y H ∈ s ∧ ⇑f (g y H) = y
--/
 theorem fg_prod {sb : submodule α β} {sc : submodule α γ}
   (hsb : sb.fg) (hsc : sc.fg) : (sb.prod sc).fg :=
 let ⟨tb, htb⟩ := fg_def.1 hsb, ⟨tc, htc⟩ := fg_def.1 hsc in
