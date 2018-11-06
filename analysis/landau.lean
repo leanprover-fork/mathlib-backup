@@ -51,14 +51,31 @@ end
 theorem eqoP : (∃ h, f = o[h]_(F) e) ↔ (f =o_(F) e) :=
 by simpa using addeqoP _ f 0 _
 
+variables {f g e F}
+
 lemma littleoE : littleo F f e → mklittleo F f e = f :=
 assume hf, by simp [mklittleo, hf]
 
-lemma littleo_mklittleo : littleo F (mklittleo F f g) g :=
-by by_cases H : littleo F f g; simp [mklittleo, H, littleo0]
+@[simp]
+lemma littleo_mklittleo : littleo F (mklittleo F f e) e :=
+by by_cases H : littleo F f e; simp [mklittleo, H, littleo0]
+
+lemma littleo_def (H : f =o_(F) e) : littleo F f e :=
+by rw H ; simp
 
 lemma add_littleo (hf : f =o_(F) e) (hg : g =o_(F) e) : littleo F (f + g) e :=
-sorry
+begin
+  intros ε εpos,
+  replace hf := littleo_def hf (ε/2) (half_pos εpos),
+  replace hg := littleo_def hg (ε/2) (half_pos εpos),
+  apply F.sets_of_superset (F.inter_sets hf hg),
+  rintro a ⟨af, ag⟩, 
+  exact calc 
+    ∥f a + g a∥ ≤ ∥f a∥  + ∥g a∥            : norm_triangle _ _
+            ... ≤ ε/2 * ∥e a∥ + ε/2 * ∥e a∥ : add_le_add af ag
+            ... = (ε/2 + ε/2) * ∥e a∥       : by rw ←add_mul
+            ... = ε * ∥e a∥                 : by rw add_halves,
+end
 
 lemma littleo_eq_littleo : o[f]_(F) e =o_(F) e :=
 by rw ←eqoP ; existsi _ ; refl
@@ -67,11 +84,22 @@ lemma littleo_add : littleo F ((o[f]_(F) e) + o[g]_(F) e) e :=
 by apply add_littleo ; apply littleo_eq_littleo
 
 lemma addo : (o[f]_(F) e) + (o[g]_(F) e) =o_(F) e :=
-by rw littleoE _ _ _ (littleo_add _ _ _ _)
+by rw littleoE littleo_add
 
 lemma addox (x : α) :
   (o[f]_(F) e) x + (o[g]_(F) e) x = 
-  (o[(o[f]_(F) e) + o[g]_(F) e]_(F) e) x := sorry
+  (o[(o[f]_(F) e) + o[g]_(F) e]_(F) e) x :=
+begin
+  rw addo,
+  conv {
+    to_rhs,
+    rw littleoE littleo_mklittleo,
+    },
+  unfold mklittleo,
+  split_ifs ; simp [*] ; exfalso ; apply h_2 ; 
+  apply add_littleo; apply eq.symm ; apply littleoE ; 
+  assumption <|> apply littleo0
+end
 --Proof. by move: x; rewrite - /(_ + _ =1 _) {1}addo. Qed.
  
 
@@ -82,7 +110,7 @@ notation fx `=` gx ` +o_(` binder ` ↗ ` F `) ` ex :=
 end littleo
 
 section bigO
-variables (F : filter α)  (f g : α → β) 
+variables (F : filter α)  (f g h : α → β) 
 
 /-- `bigO_def F f g` means f is O(g) near F, expressed in weird way-/
 def bigO_def := ∀ᶠ k in at_top, ∀ᶠ x in F, ∥f x∥ ≤ k * ∥g x∥
@@ -128,16 +156,58 @@ end
 def mkbigO (F : filter α) (g : α → β) (f : α → β) :=
   if bigO_def F f g then f else 0
 
+@[simp]
 lemma bigO_mkbigO : bigO_def F (mkbigO F g f) g :=
 by by_cases H : bigO_def F f g; simp [mkbigO, H, bigO0]
 
 notation `O_(`F`) ` g := mkbigO F g
+notation f `=O_(` F `) ` g := (f = mkbigO F g f)
 notation f `=` g ` +O_(` F `) ` h := (f = g + mkbigO F h (f - g))
+notation `O[`f`]_(`F`) ` g := mkbigO F g f
 
+/- notation `o[`f`]_(`F`) ` e := mklittleo F f e
+notation `o_(`F`) ` e := mklittleo F _ e
+notation f `=o_(` F `) ` e := (f = o[f]_(F) e)
+notation f `=` g ` +o_(` F `) ` e := (f = g + o[f - g]_(F) e)
+ -/
+lemma bigOE : bigO_def F f g → mkbigO F g f = f :=
+assume hf, by simp [mkbigO, hf]
 
-/- lemma addO : [O_F e of f] + [O_F e of g] =O_F e.
-Proof. by rewrite [RHS]bigOE. Qed.
+variables {F f g h}
 
+lemma bigO_def_of_bigO (H : f =O_(F) g) : bigO_def F f g :=
+by rw H ; simp
+
+lemma add_bigO (hf : bigO_def F f g) (hh : bigO_def F h g) :
+  bigO_def F (f + h) g :=
+begin
+  rw bigO_exP at *,
+  rcases hf with ⟨kf, kf_pos, Hkf⟩,
+  rcases hh with ⟨kh, kh_pos, Hkh⟩,
+  existsi [kf+kh, add_pos kf_pos kh_pos],
+  apply F.sets_of_superset (F.inter_sets Hkf Hkh),
+  rintro a ⟨a_in, a_in'⟩,
+  exact calc 
+  ∥f a + h a∥ ≤ ∥f a∥ + ∥h a∥ : norm_triangle _ _
+         ... ≤ kf*∥g a∥ + kh*∥g a∥ : add_le_add a_in a_in'
+         ... ≤ _ : by rw ←add_mul
+end
+
+lemma add_bigO' (hf : f =O_(F) g) (hg : g =O_(F) g) : bigO_def F (f + h) g :=
+begin
+  sorry
+end
+
+lemma addO : (O[f]_(F) g) + (O[h]_(F) g) =O_(F) g :=
+begin
+  unfold mkbigO,
+  split_ifs ; {simp ; done } <|> exfalso,  
+  all_goals { try { simp at h_3 } },
+  { exact h_3 (add_bigO h_1 h_2) },
+  all_goals { contradiction }
+end
+
+/-
 lemma addOx :
   [O_F e of f] x + [O_F e of g] x =
   [O_F e of [O_F e of f] + [O_F e of g]] x.
