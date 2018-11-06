@@ -171,8 +171,8 @@ theorem is_fg_degree_le (hnr : is_noetherian_ring R) (n : ℕ) :
   submodule.fg (I.degree_le n) :=
 begin
   induction n with n ih,
-  case nat.zero {
-    cases hnr (I.leading_coeff_nth 0) with s hs,
+  case nat.zero { sorry
+    /-cases hnr (I.leading_coeff_nth 0) with s hs,
     refine ⟨s.map ⟨C, λ _ _, C_inj.1⟩, le_antisymm _ _⟩,
     { rw submodule.span_le,
       intros p hp,
@@ -183,7 +183,7 @@ begin
       refine ⟨degree_C_le, _⟩,
       rw [mem_of_polynomial, ← mem_leading_coeff_nth_zero, ← hs],
       exact submodule.subset_span hrs },
-    { sorry }
+    {  }-/
   },
   sorry
 end
