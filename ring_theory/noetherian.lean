@@ -26,6 +26,9 @@ theorem fg_def {s : submodule α β} :
   exact ⟨t, rfl⟩
 end⟩
 
+theorem fg_bot : (⊥ : submodule α β).fg :=
+⟨∅, by rw [finset.coe_empty, span_empty]⟩
+
 theorem fg_sup {s₁ s₂ : submodule α β}
   (hs₁ : s₁.fg) (hs₂ : s₂.fg) : (s₁ ⊔ s₂).fg :=
 let ⟨t₁, ht₁⟩ := fg_def.1 hs₁, ⟨t₂, ht₂⟩ := fg_def.1 hs₂ in
@@ -37,7 +40,23 @@ variables {f : β →ₗ γ}
 theorem fg_map {s : submodule α β} (hs : s.fg) : (s.map f).fg :=
 let ⟨t, ht⟩ := fg_def.1 hs in fg_def.2 ⟨f '' t, finite_image _ ht.1, by rw [span_image, ht.2]⟩
 
-theorem fg_prod' {sb : submodule α β} {sc : submodule α γ}
+/-#check linear_map.comap_map_eq_self
+theorem fg_map_iff (hker : f.ker = ⊥) {s : submodule α β} :
+  (s.map f).fg ↔ s.fg :=
+⟨λ hs, let ⟨t, ht⟩ := fg_def.1 hs in begin
+  haveI := classical.dec,
+  have : ∀ y ∈ t, ∃ x, x ∈ s ∧ f x = y,
+  { intros y hy, rw [← mem_map, ← ht.2], exact subset_span hy },
+  have : ∃ g : γ → β, ∀ y ∈ t, g y ∈ s ∧ f (g y) = y,
+  { choose g hg, existsi λ y, if H : y ∈ t then g y H else 0,
+    intros y hy, simp only [dif_pos hy], apply hg },
+  cases this with g hg, clear this,
+end, fg_map⟩-/
+/-
+g : Π (y : γ), y ∈ t → β,
+hg : ∀ (y : γ) (H : y ∈ t), g y H ∈ s ∧ ⇑f (g y H) = y
+-/
+theorem fg_prod {sb : submodule α β} {sc : submodule α γ}
   (hsb : sb.fg) (hsc : sc.fg) : (sb.prod sc).fg :=
 let ⟨tb, htb⟩ := fg_def.1 hsb, ⟨tc, htc⟩ := fg_def.1 hsc in
 fg_def.2 ⟨prod.inl '' tb ∪ prod.inr '' tc,
@@ -105,6 +124,23 @@ variables [ring α] [add_comm_group β] [add_comm_group γ]
 variables [module α β] [module α γ]
 include α
 
+theorem is_noetherian_submodule {N : submodule α β} :
+  is_noetherian α N ↔ ∀ s : submodule α β, s ≤ N → s.fg :=
+⟨λ hn s hs, have s ≤ N.subtype.range, from (N.range_subtype).symm ▸ hs,
+  linear_map.map_comap_eq_self this ▸ submodule.fg_map (hn _),
+λ h s, submodule.fg_exact N.subtype (h _ $ submodule.map_subtype_le _ _) $
+  by rw [submodule.ker_subtype, inf_bot_eq]; exact submodule.fg_bot⟩
+
+theorem is_noetherian_submodule_left {N : submodule α β} :
+  is_noetherian α N ↔ ∀ s : submodule α β, (N ⊓ s).fg :=
+is_noetherian_submodule.trans
+⟨λ H s, H _ inf_le_left, λ H s hs, (inf_of_le_right hs) ▸ H _⟩
+
+theorem is_noetherian_submodule_right {N : submodule α β} :
+  is_noetherian α N ↔ ∀ s : submodule α β, (s ⊓ N).fg :=
+is_noetherian_submodule.trans
+⟨λ H s, H _ inf_le_right, λ H s hs, (inf_of_le_left hs) ▸ H _⟩
+
 variable (β)
 theorem is_noetherian_of_surjective (f : β →ₗ γ) (hf : f.range = ⊤)
   (hb : is_noetherian α β) : is_noetherian α γ :=
@@ -138,12 +174,8 @@ begin
     { intro, ext i, refl } },
   intro s,
   induction s using finset.induction with a s has ih,
-  { intro s, split, swap, exact ∅,
-    change submodule.span ∅ = s,
-    rw [submodule.span_empty, eq_comm, eq_bot_iff],
-    intros x hx,
-    rw [submodule.mem_coe, submodule.mem_bot],
-    ext i, cases i.2 },
+  { intro s, convert submodule.fg_bot, apply eq_bot_iff.2,
+    intros x hx, refine submodule.mem_bot.2 _, ext i, cases i.2 },
   refine is_noetherian_of_linear_equiv ⟨_, _, _, _, _, _⟩ (is_noetherian_prod (hb a) ih),
   { exact λ f i, or.by_cases (finset.mem_insert.1 i.2)
       (λ h : i.1 = a, show β i.1, from (eq.rec_on h.symm f.1))

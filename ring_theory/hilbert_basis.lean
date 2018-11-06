@@ -214,24 +214,8 @@ end
 
 theorem is_fg_degree_le (hnr : is_noetherian_ring R) (n : ℕ) :
   submodule.fg (I.degree_le n) :=
-begin
-  induction n with n ih,
-  case nat.zero { sorry
-    /-cases hnr (I.leading_coeff_nth 0) with s hs,
-    refine ⟨s.map ⟨C, λ _ _, C_inj.1⟩, le_antisymm _ _⟩,
-    { rw submodule.span_le,
-      intros p hp,
-      simp only [submodule.mem_coe, finset.mem_coe,
-        finset.mem_map, function.embedding.coe_fn_mk,
-        degree_le, submodule.mem_inf, mem_degree_le] at hp ⊢,
-      rcases hp with ⟨r, hrs, rfl⟩,
-      refine ⟨degree_C_le, _⟩,
-      rw [mem_of_polynomial, ← mem_leading_coeff_nth_zero, ← hs],
-      exact submodule.subset_span hrs },
-    {  }-/
-  },
-  sorry
-end
+is_noetherian_submodule_left.1 (is_noetherian_of_fg_of_noetherian _ hnr
+  ⟨_, degree_le_eq_span_X_pow.symm⟩) _
 
 end ideal
 
@@ -241,21 +225,59 @@ let L := I.leading_coeff in
 let M := well_founded.min (is_noetherian_iff_well_founded.1 hnr)
   (set.range I.leading_coeff_nth) (set.ne_empty_of_mem ⟨0, rfl⟩) in
 have hm : M ∈ set.range I.leading_coeff_nth := well_founded.min_mem _ _ _,
-let ⟨N, HN⟩ := hm in
-have gen' : ∀ n, ∃ s : finset (polynomial R), (↑s : set (polynomial R)) ⊆ ↑I ∧
-  (∀ x ∈ s, polynomial.degree x ≤ ↑n) ∧
-  submodule.span (polynomial.lcoeff R n '' ↑s) = ideal.leading_coeff_nth I n := sorry,
-let ⟨gen, hgen⟩ := classical.skolem.1 gen' in
-⟨finset.bind (finset.range (N+1)) gen,
-le_antisymm (ideal.span_le.2 $ λ p hp, let ⟨n, hnN, hpn⟩ := finset.mem_bind.1 hp in (hgen n).1 hpn) $
-λ p hpI, begin
-  generalize h : p.nat_degree = n,
-  induction n using nat.strong_induction_on with n ih,
-  sorry
+let ⟨N, HN⟩ := hm, ⟨s, hs⟩ := I.is_fg_degree_le hnr N in
+have hm2 : ∀ k, I.leading_coeff_nth k ≤ M := λ k, or.cases_on (le_or_lt k N)
+  (λ h, HN ▸ I.leading_coeff_nth_mono h)
+  (λ h x hx, classical.by_contradiction $ λ hxm,
+    have ¬M < I.leading_coeff_nth k, by refine well_founded.not_lt_min
+      (is_noetherian_iff_well_founded.1 hnr) _ _ _; exact ⟨k, rfl⟩,
+    this ⟨HN ▸ I.leading_coeff_nth_mono (le_of_lt h), λ H, hxm (H hx)⟩),
+⟨s, le_antisymm (ideal.span_le.2 $ λ x hx, have x ∈ I.degree_le N, from hs ▸ submodule.subset_span hx, this.2) $ begin
+  intros p hp, generalize hn : p.nat_degree = k,
+  induction k using nat.strong_induction_on with k ih generalizing p,
+  cases le_or_lt k N,
+  { subst k,
+    have : p ∈ I.degree_le N,
+    { exact ⟨polynomial.mem_degree_le.2 (le_trans polynomial.degree_le_nat_degree $ with_bot.coe_le_coe.2 h), hp⟩ },
+    rw ← hs at this,
+    apply submodule.span_induction this,
+    { exact λ _ hx, ideal.subset_span hx },
+    { exact (ideal.span ↑s).zero_mem },
+    { exact λ _ _ h1 h2, (ideal.span ↑s).add_mem h1 h2 },
+    { intros c f hf, rw ← polynomial.C_mul',
+      exact (ideal.span ↑s).mul_mem_left hf } },
+  { have hp0 : p ≠ 0,
+    { rintro rfl, cases hn, exact nat.not_lt_zero _ h },
+    have : (0 : R) ≠ 1,
+    { intro h, apply hp0, ext i, refine (mul_one _).symm.trans _,
+      rw [← h, mul_zero], refl },
+    letI : nonzero_comm_ring R := { zero_ne_one := this,
+      ..(infer_instance : comm_ring R) },
+    have : p.leading_coeff ∈ I.leading_coeff_nth N,
+    { rw HN, exact hm2 k ((I.mem_leading_coeff_nth _ _).2
+        ⟨_, hp, hn ▸ polynomial.degree_le_nat_degree, rfl⟩) },
+    rw I.mem_leading_coeff_nth at this,
+    rcases this with ⟨q, hq, hdq, hlqp⟩,
+    have hq0 : q ≠ 0,
+    { intro H, rw [← polynomial.leading_coeff_eq_zero] at H,
+      rw [hlqp, polynomial.leading_coeff_eq_zero] at H, exact hp0 H },
+    have h1 : p.degree = (q * polynomial.X ^ (k - q.nat_degree)).degree,
+    { rw [polynomial.degree_mul_eq', polynomial.degree_X_pow],
+      rw [polynomial.degree_eq_nat_degree hp0, polynomial.degree_eq_nat_degree hq0],
+      rw [← with_bot.coe_add, nat.add_sub_cancel', hn],
+      { refine le_trans (polynomial.nat_degree_le_of_degree_le hdq) (le_of_lt h) },
+      rw [polynomial.leading_coeff_X_pow, mul_one],
+      exact mt polynomial.leading_coeff_eq_zero.1 hq0 },
+    have h2 : p.leading_coeff = (q * polynomial.X ^ (k - q.nat_degree)).leading_coeff,
+    { rw [← hlqp, polynomial.leading_coeff_mul_X_pow] },
+    have := polynomial.degree_sub_lt h1 hp0 h2,
+    rw [polynomial.degree_eq_nat_degree hp0] at this,
+    rw ← sub_add_cancel p (q * polynomial.X ^ (k - q.nat_degree)),
+    refine (ideal.span ↑s).add_mem _ ((ideal.span ↑s).mul_mem_right _),
+    { by_cases hpq : p - q * polynomial.X ^ (k - q.nat_degree) = 0,
+      { rw hpq, exact ideal.zero_mem _ },
+      refine ih _ _ (I.sub_mem hp (I.mul_mem_right hq)) rfl,
+      rwa [polynomial.degree_eq_nat_degree hpq, with_bot.coe_lt_coe, hn] at this },
+    rw [polynomial.degree_eq_nat_degree hq0, with_bot.coe_le_coe] at hdq,
+    exact ih _ (lt_of_le_of_lt hdq h) hq rfl }
 end⟩
-
-#check is_noetherian_iff_well_founded
-#check well_founded.min
-#check well_founded.min_mem
-#check well_founded.not_lt_min
-#check classical.skolem
