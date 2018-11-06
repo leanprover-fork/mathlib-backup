@@ -102,13 +102,16 @@ def of_polynomial : submodule R (polynomial R) :=
 
 theorem mem_of_polynomial (x) : x ∈ I.of_polynomial ↔ x ∈ I := iff.rfl
 
+def degree_le (n : ℕ) : submodule R (polynomial R) :=
+degree_le R n ⊓ I.of_polynomial
+
 def leading_coeff_nth (n : ℕ) : ideal R :=
-(degree_le R n ⊓ I.of_polynomial).map $ lcoeff R n
+(I.degree_le n).map $ lcoeff R n
 
 theorem mem_leading_coeff_nth (n : ℕ) (x) :
   x ∈ I.leading_coeff_nth n ↔ ∃ p ∈ I, degree p ≤ n ∧ leading_coeff p = x :=
 begin
-  simp only [leading_coeff_nth, submodule.mem_map, lcoeff_apply, submodule.mem_inf, mem_degree_le],
+  simp only [leading_coeff_nth, degree_le, submodule.mem_map, lcoeff_apply, submodule.mem_inf, mem_degree_le],
   split,
   { rintro ⟨p, ⟨hpdeg, hpI⟩, rfl⟩,
     cases lt_or_eq_of_le hpdeg with hpdeg hpdeg,
@@ -127,6 +130,14 @@ begin
       exact le_refl _ },
     { rw [leading_coeff, ← coeff_mul_X_pow p (n - nat_degree p), this] } }
 end
+
+theorem mem_leading_coeff_nth_zero (x) :
+  x ∈ I.leading_coeff_nth 0 ↔ C x ∈ I :=
+(mem_leading_coeff_nth _ _ _).trans
+⟨λ ⟨p, hpI, hpdeg, hpx⟩, by rwa [← hpx, leading_coeff,
+  nat.eq_zero_of_le_zero (nat_degree_le_of_degree_le hpdeg),
+  ← eq_C_of_degree_le_zero hpdeg],
+λ hx, ⟨C x, hx, degree_C_le, leading_coeff_C x⟩⟩
 
 theorem leading_coeff_nth_mono {m n : ℕ} (H : m ≤ n) :
   I.leading_coeff_nth m ≤ I.leading_coeff_nth n :=
@@ -154,6 +165,27 @@ begin
   { exact ⟨0⟩ },
   intros i j, exact ⟨i + j, I.leading_coeff_nth_mono (nat.le_add_right _ _),
     I.leading_coeff_nth_mono (nat.le_add_left _ _)⟩
+end
+
+theorem is_fg_degree_le (hnr : is_noetherian_ring R) (n : ℕ) :
+  submodule.fg (I.degree_le n) :=
+begin
+  induction n with n ih,
+  case nat.zero {
+    cases hnr (I.leading_coeff_nth 0) with s hs,
+    refine ⟨s.map ⟨C, λ _ _, C_inj.1⟩, le_antisymm _ _⟩,
+    { rw submodule.span_le,
+      intros p hp,
+      simp only [submodule.mem_coe, finset.mem_coe,
+        finset.mem_map, function.embedding.coe_fn_mk,
+        degree_le, submodule.mem_inf, mem_degree_le] at hp ⊢,
+      rcases hp with ⟨r, hrs, rfl⟩,
+      refine ⟨degree_C_le, _⟩,
+      rw [mem_of_polynomial, ← mem_leading_coeff_nth_zero, ← hs],
+      exact submodule.subset_span hrs },
+    { sorry }
+  },
+  sorry
 end
 
 end ideal

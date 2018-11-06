@@ -706,15 +706,6 @@ variable {α}
 
 @[simp] lemma lcoeff_apply (n : ℕ) (f : polynomial α) : lcoeff α n f = coeff f n := rfl
 
-variable (α)
-def lcoeff (n : ℕ) : polynomial α →ₗ α :=
-{ to_fun := λ f, coeff f n,
-  add := λ f g, coeff_add f g n,
-  smul := λ r p, coeff_smul p r n }
-variable {α}
-
-@[simp] lemma lcoeff_apply (n : ℕ) (f : polynomial α) : lcoeff α n f = coeff f n := rfl
-
 instance C.is_ring_hom : is_ring_hom (@C α _ _) := by apply is_ring_hom.of_semiring
 
 instance eval₂.is_ring_hom {β} [comm_ring β]
