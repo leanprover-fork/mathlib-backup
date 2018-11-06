@@ -102,7 +102,10 @@ def is_noetherian (α β) [ring α] [add_comm_group β] [module α β] : Prop :=
 
 theorem is_noetherian_prod {α β γ} [ring α] [add_comm_group β] [module α β] [add_comm_group γ] [module α γ]
   (hb : is_noetherian α β) (hc : is_noetherian α γ) : is_noetherian α (β × γ) :=
-λ s, submodule.fg_exact (linear_map.snd β γ) (hc _) sorry
+λ s, submodule.fg_exact (linear_map.snd β γ) (hc _) $
+have s ⊓ linear_map.ker (linear_map.snd β γ) ≤ linear_map.range (linear_map.inl β γ),
+from λ x ⟨hx1, hx2⟩, ⟨x.1, trivial, prod.ext rfl $ eq.symm $ linear_map.mem_ker.1 hx2⟩,
+linear_map.map_comap_eq_self this ▸ submodule.fg_map _ (hb _)
 
 theorem is_noetherian_iff_well_founded
   {α β} [ring α] [add_comm_group β] [module α β] :
