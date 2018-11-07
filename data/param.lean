@@ -98,8 +98,9 @@ meta def expr.param2 (consts : name_map name) :
 | exp@_ _ := fail $
   "parma: expression " ++ exp.to_string ++ " is not translatable"
 
-meta def param2.inductive (consts : name_map name) (n p : name) :
-  tactic (name_map name) := do
+-- could replace the consts argument with 
+meta def param2.inductive_aux (consts : name_map name) (n p : name) :
+  tactic unit := do
   env ← get_env,
   ind_decl ← get_decl n,
   guard $ env.is_inductive n,
@@ -117,12 +118,29 @@ meta def param2.inductive (consts : name_map name) (n p : name) :
     (ty0, ty1, tyR) ← ty.param2 consts mk_name_map,
     return (p ++ n, tyR.mk_subst_or_app [c, c])),
   add_inductive (p ++ n) ind_decl.univ_params (3 * nparams)
-    (tyR.mk_subst_or_app [i, i]) ctorsR,
+    (tyR.mk_subst_or_app [i, i]) ctorsR
   -- we should also add to consts translations of
   -- constructors and recursors
-  return consts
+--  return consts
 
-run_cmd param2.inductive mk_name_map `nat `param2
+@[user_attribute]
+meta def parametricity_attr : user_attribute (name_map name) name :=
+{ name      := `parametricity,
+  descr     := "Parametricity rules",
+  cache_cfg := ⟨λ ns, ns.mfoldl (λ dict n, do
+    val ← parametricity_attr.get_param n,
+    pure $ dict.insert n (val ++ n)) mk_name_map, []⟩,
+  parser    := lean.parser.ident,
+  after_set := some $ λ src _ _, do
+    val ← parametricity_attr.get_param src,
+    cache ← parametricity_attr.get_cache,
+    param2.inductive_aux cache src val }
+
+--run_cmd param2.inductive mk_name_map `nat `param2
+attribute [parametricity param2] nat
+
+-- at any given time, you can get the updated consts map:
+run_cmd parametricity_attr.get_cache >>= trace
 
 #check param2.nat
 #check param2.nat.succ
