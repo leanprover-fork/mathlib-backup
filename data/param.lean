@@ -5,11 +5,7 @@ import tactic
 open expr native tactic
 
 meta def expr.instantiate_lam (nv : expr) : expr → expr
-| (lam nm bi tp bd) := bd.replace
-    (λ e i, match e with
-            | var k := if i = k then nv else none
-            | _ := none
-            end)
+| (lam nm bi tp bd) := bd.instantiate_var nv
 | e := app e nv
 
 meta def expr.mk_subst_or_app : expr → list expr → expr
