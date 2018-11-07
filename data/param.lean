@@ -1,5 +1,13 @@
+-- Binary parametricity translation (WIP)
+
 -- author: Cyril Cohen <cyril.cohen@inria.fr>
 -- with contributions and help from Rob Lewis <rob.y.lewis@gmail.com>
+-- and Johannes Hölzl <johannes.hoelzl@gmx.de>
+
+-- the translation is adapted from
+-- /Parametricity in an Impredicative Sort/
+-- by Chantal Keller and Marc Lasson
+-- in Computer Science Logic 2012 (CSL’12).
 
 import tactic
 open expr native tactic
