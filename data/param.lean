@@ -103,7 +103,7 @@ meta def expr.param2 (consts : name_map name) :
   "parma: expression " ++ exp.to_string ++ " is not translatable"
 
 -- could replace the consts argument with 
-meta def param2.inductive_aux (consts : name_map name) (n p : name) :
+meta def param2.inductive (consts : name_map name) (n p : name) :
   tactic unit := do
   env ← get_env,
   ind_decl ← get_decl n,
@@ -138,7 +138,7 @@ meta def parametricity_attr : user_attribute (name_map name) name :=
   after_set := some $ λ src _ _, do
     val ← parametricity_attr.get_param src,
     cache ← parametricity_attr.get_cache,
-    param2.inductive_aux cache src val }
+    param2.inductive cache src val }
 
 --run_cmd param2.inductive mk_name_map `nat `param2
 attribute [parametricity param2] nat
