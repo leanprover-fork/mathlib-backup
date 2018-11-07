@@ -37,7 +37,7 @@ meta def expr.abstract_ : expr →
 | e k (expr.local_const n m bi α) := k m bi α (e.abstract_local n)
 | e k _                           := e
 
-meta def expr.param2 (consts : name_map expr) :
+meta def expr.param2 (consts : name_map name) :
    expr → name_map (expr × expr × expr) → tactic (expr × expr × expr)
 | (var         db)  _ := fail $ "param: cannot translate a var"
 | (sort        lvl) _ :=
@@ -46,7 +46,9 @@ meta def expr.param2 (consts : name_map expr) :
     pi "x0" bid (var 1) $ pi "x1" bid (var 1) $ sort lvl)
 | c@(const       x lvls) _ :=
    match consts.find x with
-   | some cR := return (c, c, cR)
+   | some nR := do
+     cR ← mk_const nR,
+     return (c, c, cR)
    | _ := fail $ "param: no translation for constant " ++ to_string x
    end
 | c@(local_const x pry binfo α) lconsts := lconsts.find x
@@ -86,10 +88,31 @@ meta def expr.param2 (consts : name_map expr) :
   -- [/WRONG CODE!!!]
 | exp@_ _ := fail $ "parma: expression " ++ exp.to_string ++ " is not translatable"
 
+meta def param2.inductive (consts : name_map name) (n nR : name) : tactic unit := do
+  env ← get_env,
+  ind_decl ← get_decl n,
+  guard $ env.is_inductive n,
+  let ctors := env.constructors_of n,
+  let nparams := env.inductive_num_params n,
+  let indices := env.inductive_num_indices n,
+  let ty := ind_decl.type,
+  (ty0, ty1, tyR) ← ty.param2 consts mk_name_map,
+  let consts := consts.insert n nR,
+  ctorsR ← ctors.mmap (λ n : name, do
+    decl ← get_decl n,
+    let ty := decl.type,
+    (ty0, ty1, tyR) ← ty.param2 consts mk_name_map,
+    return (n, tyR)),
+  add_inductive nR ind_decl.univ_params (3 * nparams) tyR ctorsR
+
+run_cmd param2.inductive mk_name_map `bool `boolR
+
+#exit
+
 run_cmd do
   let e := `(λ α : Type, λ x : α, x),
   let t := `(∀ α : Type, α → α),
-  (t0,t1,tR) ← expr.param2 mk_name_map t mk_name_map,
-  (e0,e1,eR) ← expr.param2 mk_name_map e mk_name_map,
+  (t0,t1,tR) ← t.param2 mk_name_map mk_name_map,
+  (e0,e1,eR) ← e.param2 mk_name_map mk_name_map,
   teR ← infer_type eR,
   unify teR (tR.mk_app [e, e])
