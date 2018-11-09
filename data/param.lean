@@ -45,40 +45,44 @@ meta def param.intro (lconsts : name_map (expr × expr × expr))
   let freshs := (fresh0, fresh1, freshR),
   return (freshs, lconsts.insert uniq_name0 freshs, body.instantiate_var fresh0)
 
-meta def expr.abstract_ : (name → binder_info → expr → expr → expr) → 
+meta def expr.abstract_ : (name → binder_info → expr → expr → expr) →
   expr → expr → expr
 | k e (expr.local_const n m bi α) := k m bi α (e.abstract_local n)
 | k e _                           := e
 
-meta def name.param (n : nat) (x : name) : name := "param" ++ to_string n ++ x
+meta def name.param (n : nat) (x : name) : name :=
+  "param" ++ to_string n ++ x
 
-meta def expr.param (p := 2) : expr → name_map (expr × expr × expr) →
+#check mk_const
+
+meta def expr.param' (p := 2) : expr → name_map (expr × expr × expr) →
   tactic (expr × expr × expr)
-| (var         db)  _ := fail $ "param: cannot translate a var"
-| (sort        lvl) _ :=
+| (var         db)  _ := fail $ "expr.param: cannot translate a var"
+| (sort        lvl) _ := do
   return (sort lvl, sort lvl,
     lam "α0" bid (sort lvl) $ lam "α1" bid (sort lvl) $
     pi "x0" bid (var 1) $ pi "x1" bid (var 1) $ sort lvl)
 | c@(const       x lvls) _ := do
-   cR ← mk_const (x.param p),
-   return (c, c, cR)
+   trace $ "lvls(" ++ to_string x ++ ")=" ++ to_string lvls,
+   ls   ← mk_num_meta_univs lvls.length,
+   return (c, c, const (x.param p) ls)
 | c@(local_const x pry binfo α) lconsts := lconsts.find x
 | (app         u v) lconsts := do
-  (u0, u1, uR) ← u.param lconsts,
-  (v0, v1, vR) ← v.param lconsts,
+  (u0, u1, uR) ← u.param' lconsts,
+  (v0, v1, vR) ← v.param' lconsts,
   return (app u0 v0, app u1 v1, uR.mk_app [v0, v1, vR])
 | (lam         x binfo α body) lconsts := do
-  (α0, α1, αR) ← α.param lconsts,
+  (α0, α1, αR) ← α.param' lconsts,
   ((x0, x1, xR), lconstsx, bodyx) ← param.intro lconsts x α0 α1 αR body,
-  (body0, body1, bodyR) ← bodyx.param lconstsx,
+  (body0, body1, bodyR) ← bodyx.param' lconstsx,
   let t0 := body0.abstract_ lam x0,
   let t1 := body1.abstract_ lam x1,
   let tR := ((bodyR.abstract_ lam xR).abstract_ lam x1).abstract_ lam x0,
   return (t0, t1, tR)
 | (pi          x binfo α body) lconsts := do
-  (α0, α1, αR) ← α.param lconsts,
+  (α0, α1, αR) ← α.param' lconsts,
   ((x0, x1, xR), lconstsx, bodyx) ← param.intro lconsts x α0 α1 αR body,
-  (body0, body1, bodyR) ← bodyx.param lconstsx,
+  (body0, body1, bodyR) ← bodyx.param' lconstsx,
   let t0 := body0.abstract_ pi x0,
   let t1 := body1.abstract_ pi x1,
   f0 ← mk_local_def "f0" t0,
@@ -88,22 +92,24 @@ meta def expr.param (p := 2) : expr → name_map (expr × expr × expr) →
      ).abstract_ lam f1).abstract_ lam f0,
   return (t0, t1, tR)
 | (elet        x α val body) lconsts := fail $
-  "param: elet not implemented"
+  "param': elet not implemented"
   -- [WRONG CODE!!!]
-  -- (α0, α1, αR) ← α.param,
-  -- (val0, val1, valR) ← val.param,
-  -- (body0, body1, bodyR) ← body.param,
+  -- (α0, α1, αR) ← α.param',
+  -- (val0, val1, valR) ← val.param',
+  -- (body0, body1, bodyR) ← body.param',
   -- let t0_ := elet (x.ext "0") α0 val0,
   -- let t1_ := elet (x.ext "1") α1 val1,
   -- let tR := t0_ $ t1_ $ elet (x.ext "R") stripped_αR valR bodyR,
   -- return (t0_ body0, t1_ body1, tR)
   -- [/WRONG CODE!!!]
 | exp@_ _ := fail $
-  "parma: expression " ++ exp.to_string ++ " is not translatable"
+  "expr.param': expression " ++ exp.to_string ++ " is not translatable"
 
--- could replace the consts argument with 
-meta def param.inductive (p := 2) (n : name) :
-  tactic unit := do
+meta def expr.param (p := 2) (t : expr) (lconst := mk_name_map) :=
+  expr.param' p t lconst
+
+-- could replace the consts argument with
+meta def param.inductive (p := 2) (n : name) : tactic unit := do
   env ← get_env,
   ind_decl ← get_decl n,
   guard $ env.is_inductive n,
@@ -112,59 +118,101 @@ meta def param.inductive (p := 2) (n : name) :
   let nparams := env.inductive_num_params n,
   let indices := env.inductive_num_indices n,
   let ty := ind_decl.type,
-  (ty0, ty1, tyR) ← ty.param p mk_name_map,
+  (ty0, ty1, tyR) ← ty.param p,
   ctorsR ← ctors.mmap (λ n : name, do
     decl ← get_decl n,
     c ← mk_const n,
     let ty := decl.type,
-    (ty0, ty1, tyR) ← ty.param p mk_name_map,
+    (ty0, ty1, tyR) ← ty.param p,
     return (n.param p, tyR.mk_subst_or_app [c, c])),
+  trace ctors,
+  trace ctorsR,
+  trace (tyR.mk_subst_or_app [i, i]),
   add_inductive (n.param p) ind_decl.univ_params ((p + 1) * nparams)
     (tyR.mk_subst_or_app [i, i]) ctorsR
 
-#check lean.parser
+meta def param.def (p := 2) (n : name) : tactic unit := do
+  env ← get_env,
+  guard $ env.is_definition n,
+  decl ← env.get n,
+  match decl with
+  | (declaration.defn _ lvls α body _ _) := do
+    (_, _, αR) ← α.param 2,
+    (_, _, bodyR) ← body.param 2,
+    trace αR,
+    trace bodyR,
+    add_decl $ mk_definition (n.param 2) lvls αR bodyR
+  | _ := fail $ "param.def:  not a definition"
+  end
+
+meta def param.decl (p := 2) (n : name) : tactic unit := do
+  env ← get_env,
+  if env.is_inductive n then param.inductive p n
+  else if env.is_definition n then param.def p n
+  else fail $ "translate: cannot translate " ++ to_string n
 
 @[user_command]
 meta def param_cmd (_ : parse $ tk "#param") : lean.parser unit := do
   ns ← many ident,
-  of_tactic $ ns.mmap' (param.inductive 2)
+  of_tactic $ ns.mmap' (param.decl 2)
 
-#param bool
+----------------------
+-- Working examples --
+----------------------
+
+#param bool nat
+
+#check param.«2».bool
+#print param.«2».nat.rec
+
+#print and
+
+#param and
+
+
+--------------------------
+-- Not working examples --
+--------------------------
+universes u v w
+
+#print punit
+
 
 #param punit
 
-#check param.«2».nat.
+-- handmade def
+inductive param.«2».punit : punit → punit → Type u
+| star : param.«2».punit punit.star punit.star
 
-#print nat.brec_on
-#print param.«2».nat.rec
+#print param.«2».punit
 
-#exit
+#print pprod
 
-@[user_attribute]
-meta def parametricity_attr : user_attribute (name_map name) name :=
-{ name      := `parametricity,
-  descr     := "Parametricity rules",
-  cache_cfg := ⟨λ ns, ns.mfoldl (λ dict n, do
-    val ← parametricity_attr.get_param n
-    pure $ dict.insert n (val ++ n)) mk_name_map, []⟩,
-  parser    := lean.parser.ident,
-  after_set := some $ λ src _ _, do
-    val ← parametricity_attr.get_param src,
-    param2.inductive src val }
+#param pprod
 
---run_cmd param2.inductive mk_name_map `nat `param2
-attribute [parametricity param2] nat
+inductive param.«2».pprod : Π (α0 α1 : Type u), (α0 → α1 → Type u) →
+  Π (β0 β1 : Type v), (β0 → β1 → Type v) →
+  pprod α0 β0 → pprod α1 β1 → Type ((max 1 u v) + 1)
+| mk : Π (α0 α1 : Type u) (αR : α0 → α1 → Type u) (β0 β1 : Type v) (βR : β0 → β1 → Type v)
+  (fst0 : α0) (fst1 : α1), αR fst0 fst1 →
+    Π (snd0 : β0) (snd1 : β1),
+      βR snd0 snd1 → param.«2».pprod α0 α1 αR β0 β1 βR ⟨fst0, snd0⟩ ⟨fst1, snd1⟩
 
--- at any given time, you can get the updated consts map:
-run_cmd parametricity_attr.get_cache >>= trace
+#param prod
 
-#check param2.nat
-#check param2.nat.succ
+#param bool.size_of
+
+
+#print nat.below
+
+#param nat.below
 
 run_cmd do
   let e := `(λ α : Type, λ x : α, x),
   let t := `(∀ α : Type, α → α),
-  (t0,t1,tR) ← t.param2 mk_name_map mk_name_map,
-  (e0,e1,eR) ← e.param2 mk_name_map mk_name_map,
+  (t0,t1,tR) ← t.param 2,
+  (e0,e1,eR) ← e.param 2,
   teR ← infer_type eR,
   unify teR (tR.mk_app [e, e])
+
+#exit
