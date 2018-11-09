@@ -15,6 +15,7 @@ in Computer Science Logic 2012 (CSL’12).
 
 import tactic
 open expr native tactic
+open lean.parser interactive
 
 meta def expr.instantiate_lam (nv : expr) : expr → expr
 | (lam nm bi tp bd) := bd.instantiate_var nv
@@ -44,42 +45,40 @@ meta def param.intro (lconsts : name_map (expr × expr × expr))
   let freshs := (fresh0, fresh1, freshR),
   return (freshs, lconsts.insert uniq_name0 freshs, body.instantiate_var fresh0)
 
-meta def expr.abstract_ : expr →
- (name → binder_info → expr → expr → expr) → expr → expr
-| e k (expr.local_const n m bi α) := k m bi α (e.abstract_local n)
-| e k _                           := e
+meta def expr.abstract_ : (name → binder_info → expr → expr → expr) → 
+  expr → expr → expr
+| k e (expr.local_const n m bi α) := k m bi α (e.abstract_local n)
+| k e _                           := e
 
-meta def expr.param2 (consts : name_map name) :
-   expr → name_map (expr × expr × expr) → tactic (expr × expr × expr)
+meta def name.param (n : nat) (x : name) : name := "param" ++ to_string n ++ x
+
+meta def expr.param (p := 2) : expr → name_map (expr × expr × expr) →
+  tactic (expr × expr × expr)
 | (var         db)  _ := fail $ "param: cannot translate a var"
 | (sort        lvl) _ :=
   return (sort lvl, sort lvl,
     lam "α0" bid (sort lvl) $ lam "α1" bid (sort lvl) $
     pi "x0" bid (var 1) $ pi "x1" bid (var 1) $ sort lvl)
-| c@(const       x lvls) _ :=
-   match consts.find x with
-   | some nR := do
-     -- cR ← mk_const nR,
-     return (c, c, const nR lvls)
-   | _ := fail $ "param: no translation for constant " ++ to_string x
-   end
+| c@(const       x lvls) _ := do
+   cR ← mk_const (x.param p),
+   return (c, c, cR)
 | c@(local_const x pry binfo α) lconsts := lconsts.find x
 | (app         u v) lconsts := do
-  (u0, u1, uR) ← u.param2 lconsts,
-  (v0, v1, vR) ← v.param2 lconsts,
+  (u0, u1, uR) ← u.param lconsts,
+  (v0, v1, vR) ← v.param lconsts,
   return (app u0 v0, app u1 v1, uR.mk_app [v0, v1, vR])
 | (lam         x binfo α body) lconsts := do
-  (α0, α1, αR) ← α.param2 lconsts,
+  (α0, α1, αR) ← α.param lconsts,
   ((x0, x1, xR), lconstsx, bodyx) ← param.intro lconsts x α0 α1 αR body,
-  (body0, body1, bodyR) ← bodyx.param2 lconstsx,
+  (body0, body1, bodyR) ← bodyx.param lconstsx,
   let t0 := body0.abstract_ lam x0,
   let t1 := body1.abstract_ lam x1,
   let tR := ((bodyR.abstract_ lam xR).abstract_ lam x1).abstract_ lam x0,
   return (t0, t1, tR)
 | (pi          x binfo α body) lconsts := do
-  (α0, α1, αR) ← α.param2 lconsts,
+  (α0, α1, αR) ← α.param lconsts,
   ((x0, x1, xR), lconstsx, bodyx) ← param.intro lconsts x α0 α1 αR body,
-  (body0, body1, bodyR) ← bodyx.param2 lconstsx,
+  (body0, body1, bodyR) ← bodyx.param lconstsx,
   let t0 := body0.abstract_ pi x0,
   let t1 := body1.abstract_ pi x1,
   f0 ← mk_local_def "f0" t0,
@@ -91,9 +90,9 @@ meta def expr.param2 (consts : name_map name) :
 | (elet        x α val body) lconsts := fail $
   "param: elet not implemented"
   -- [WRONG CODE!!!]
-  -- (α0, α1, αR) ← α.param2,
-  -- (val0, val1, valR) ← val.param2,
-  -- (body0, body1, bodyR) ← body.param2,
+  -- (α0, α1, αR) ← α.param,
+  -- (val0, val1, valR) ← val.param,
+  -- (body0, body1, bodyR) ← body.param,
   -- let t0_ := elet (x.ext "0") α0 val0,
   -- let t1_ := elet (x.ext "1") α1 val1,
   -- let tR := t0_ $ t1_ $ elet (x.ext "R") stripped_αR valR bodyR,
@@ -103,7 +102,7 @@ meta def expr.param2 (consts : name_map name) :
   "parma: expression " ++ exp.to_string ++ " is not translatable"
 
 -- could replace the consts argument with 
-meta def param2.inductive (consts : name_map name) (n p : name) :
+meta def param.inductive (p := 2) (n : name) :
   tactic unit := do
   env ← get_env,
   ind_decl ← get_decl n,
@@ -113,32 +112,45 @@ meta def param2.inductive (consts : name_map name) (n p : name) :
   let nparams := env.inductive_num_params n,
   let indices := env.inductive_num_indices n,
   let ty := ind_decl.type,
-  (ty0, ty1, tyR) ← ty.param2 consts mk_name_map,
-  let consts := consts.insert n (p ++ n),
+  (ty0, ty1, tyR) ← ty.param p mk_name_map,
   ctorsR ← ctors.mmap (λ n : name, do
     decl ← get_decl n,
     c ← mk_const n,
     let ty := decl.type,
-    (ty0, ty1, tyR) ← ty.param2 consts mk_name_map,
-    return (p ++ n, tyR.mk_subst_or_app [c, c])),
-  add_inductive (p ++ n) ind_decl.univ_params (3 * nparams)
+    (ty0, ty1, tyR) ← ty.param p mk_name_map,
+    return (n.param p, tyR.mk_subst_or_app [c, c])),
+  add_inductive (n.param p) ind_decl.univ_params ((p + 1) * nparams)
     (tyR.mk_subst_or_app [i, i]) ctorsR
-  -- we should also add to consts translations of
-  -- constructors and recursors
---  return consts
+
+#check lean.parser
+
+@[user_command]
+meta def param_cmd (_ : parse $ tk "#param") : lean.parser unit := do
+  ns ← many ident,
+  of_tactic $ ns.mmap' (param.inductive 2)
+
+#param bool
+
+#param punit
+
+#check param.«2».nat.
+
+#print nat.brec_on
+#print param.«2».nat.rec
+
+#exit
 
 @[user_attribute]
 meta def parametricity_attr : user_attribute (name_map name) name :=
 { name      := `parametricity,
   descr     := "Parametricity rules",
   cache_cfg := ⟨λ ns, ns.mfoldl (λ dict n, do
-    val ← parametricity_attr.get_param n,
+    val ← parametricity_attr.get_param n
     pure $ dict.insert n (val ++ n)) mk_name_map, []⟩,
   parser    := lean.parser.ident,
   after_set := some $ λ src _ _, do
     val ← parametricity_attr.get_param src,
-    cache ← parametricity_attr.get_cache,
-    param2.inductive cache src val }
+    param2.inductive src val }
 
 --run_cmd param2.inductive mk_name_map `nat `param2
 attribute [parametricity param2] nat
