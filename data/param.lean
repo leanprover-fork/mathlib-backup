@@ -61,13 +61,23 @@ meta def expr.param' (p := 2) : expr → name_map (expr × expr × expr) →
     lam "α0" bid (sort lvl) $ lam "α1" bid (sort lvl) $
     pi "x0" bid (var 1) $ pi "x1" bid (var 1) $ sort lvl)
 | c@(const       x lvls) _ := do
-   return (c, c , const (x.param p) lvls)
+   env ← get_env,
+   if env.is_recursor x then
+   match env.inductive_type_of x with
+   | none := do
+     trace $ "expr.param: " ++ to_string x ++ " has no inductive_type_of",
+     fail "STOP"
+   | (some i) := do
+     trace $ "expr.param: " ++ to_string x ++ " not yet implemented",
+     fail "STOP"
+   end
+   else return (c, c, const (x.param p) lvls)
 | c@(local_const x pry binfo α) lconsts := lconsts.find x
 | (app         u v) lconsts := do
   (u0, u1, uR) ← u.param' lconsts,
   (v0, v1, vR) ← v.param' lconsts,
   trace $ "u= " ++ to_string u ++ ";   uR= " ++ to_string uR,
-  return (app u0 v0, app u1 v1, uR.mk_app [v0, v1, vR])
+  return (app u0 v0, app u1 v1, uR v0 v1 vR)
 | (lam         x binfo α body) lconsts := do
   (α0, α1, αR) ← α.param' lconsts,
   ((x0, x1, xR), lconstsx, bodyx) ← param.intro lconsts x α0 α1 αR body,
@@ -84,7 +94,7 @@ meta def expr.param' (p := 2) : expr → name_map (expr × expr × expr) →
   let t1 := body1.abstract_ pi x1,
   f0 ← mk_local_def "f0" t0,
   f1 ← mk_local_def "f1" t1,
-  let tR := (((((bodyR.mk_subst_or_app [app f0 x0, app f1 x1]
+  let tR := (((((bodyR.mk_subst_or_app [f0 x0, f1 x1]
      ).abstract_ pi xR).abstract_ pi x1).abstract_ pi x0
      ).abstract_ lam f1).abstract_ lam f0,
   return (t0, t1, tR)
@@ -167,13 +177,16 @@ meta def param_cmd (_ : parse $ tk "#param") : lean.parser unit := do
 ----------------------
 
 #param punit pprod bool nat and or list
+#param has_zero has_one has_neg has_add has_mul
 
 #check param.«2».bool
+#print nat.rec
 #print param.«2».nat.rec
+#print nat.succ
+#print param.«2».nat.succ
 #print param.«2».punit
 
 #print nat.below
-
 
 --------------------------
 -- Not working examples --
@@ -182,6 +195,26 @@ meta def param_cmd (_ : parse $ tk "#param") : lean.parser unit := do
 #param nat.below
 
 universe l
+def nat.rec.type := Π {C : ℕ → Sort l}, C 0 → (Π (n : ℕ), C n → C (nat.succ n)) → Π (n : ℕ), C n
+
+#print nat.rec.type
+#param nat.rec.type
+
+def param.«2».nat.rec.type : nat.rec.type → nat.rec.type → Sort (imax (max 1 (l+1)) l 1 l) :=
+  λ (f0 f1 : Π (C0 : ℕ → Sort l), C0 0 → (Π (n0 : ℕ), C0 n0 → C0 (nat.succ n0)) → Π (n0 : ℕ), C0 n0),
+  Π (C0 C1 : ℕ → Sort l) (CR : Π (a0 a1 : ℕ), param.«2».nat a0 a1 → C0 a0 → C1 a1 → Sort l) (a0 : C0 0)
+  (a1 : C1 0),
+    CR 0 0 (param.«2».has_zero.zero ℕ ℕ param.«2».nat nat.has_zero nat.has_zero param.«2».nat.has_zero) a0
+      a1 →
+    Π (a0_1 : Π (n0 : ℕ), C0 n0 → C0 (nat.succ n0)) (a1_1 : Π (n1 : ℕ), C1 n1 → C1 (nat.succ n1)),
+      (Π (n0 n1 : ℕ) (nR : param.«2».nat n0 n1) (a0 : C0 n0) (a1 : C1 n1),
+         CR n0 n1 nR a0 a1 →
+         CR (nat.succ n0) (nat.succ n1) (param.«2».nat.succ n0 n1 nR) (a0_1 n0 a0) (a1_1 n1 a1)) →
+      Π (n0 n1 : ℕ) (nR : param.«2».nat n0 n1), CR n0 n1 nR (f0 C0 a0 a0_1 n0) (f1 C1 a1 a1_1 n1)
+
+
+
+
 
 def param.«2».nat.below : Π (C0 C1 : ℕ → Sort l),
   (Π (n0 n1 : ℕ), param.«2».nat n0 n1 → C0 n0 → C1 n1 → Sort l) →
