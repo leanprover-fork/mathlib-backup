@@ -44,8 +44,11 @@ theorem eq_of_to_fun_eq : ∀ {e₁ e₂ : equiv α β}, (e₁ : α → β) = e�
     show g₁ x = g₂ x,           from injective_of_left_inverse l₁ this,
   by simp *
 
-lemma ext (f g : equiv α β) (H : ∀ x, f x = g x) : f = g :=
+@[extensionality] lemma ext (f g : equiv α β) (H : ∀ x, f x = g x) : f = g :=
 eq_of_to_fun_eq (funext H)
+
+@[extensionality] lemma perm.ext (σ τ : equiv.perm α) (H : ∀ x, σ x = τ x) : σ = τ :=
+equiv.ext _ _ H
 
 @[refl] protected def refl (α : Sort*) : α ≃ α := ⟨id, id, λ x, rfl, λ x, rfl⟩
 
@@ -73,8 +76,7 @@ rfl
 
 @[simp] theorem refl_apply (x : α) : equiv.refl α x = x := rfl
 
-@[simp] theorem trans_apply : ∀ (f : α ≃ β) (g : β ≃ γ) (a : α), (f.trans g) a = g (f a)
-| ⟨f₁, g₁, l₁, r₁⟩ ⟨f₂, g₂, l₂, r₂⟩ a := rfl
+@[simp] theorem trans_apply (f : α ≃ β) (g : β ≃ γ) (a : α) : (f.trans g) a = g (f a) := rfl
 
 @[simp] theorem apply_inverse_apply : ∀ (e : α ≃ β) (x : β), e (e.symm x) = x
 | ⟨f₁, g₁, l₁, r₁⟩ x := by simp [equiv.symm]; rw r₁
@@ -90,11 +92,11 @@ rfl
 
 @[simp] theorem cast_apply {α β} (h : α = β) (x : α) : equiv.cast h x = cast h x := rfl
 
-theorem apply_eq_iff_eq_inverse_apply : ∀ (f : α ≃ β) (x : α) (y : β), f x = y ↔ x = f.symm y
-| ⟨f₁, g₁, l₁, r₁⟩ x y := by simp [equiv.symm];
-  show f₁ x = y ↔ x = g₁ y; from
-  ⟨λ e : f₁ x = y, e ▸ (l₁ x).symm,
-   λ e : x = g₁ y, e.symm ▸ r₁ y⟩
+lemma symm_apply_eq {α β} (e : α ≃ β) {x y} : e.symm x = y ↔ x = e y :=
+⟨λ H, by simp [H.symm], λ H, by simp [H]⟩
+
+lemma eq_symm_apply {α β} (e : α ≃ β) {x y} : y = e.symm x ↔ e y = x :=
+(eq_comm.trans e.symm_apply_eq).trans eq_comm
 
 @[simp] theorem symm_symm (e : α ≃ β) : e.symm.symm = e := by cases e; refl
 
@@ -189,8 +191,10 @@ equiv_empty $ assume a, h ⟨a⟩
 def pempty_of_not_nonempty {α : Sort*} (h : ¬ nonempty α) : α ≃ pempty :=
 equiv_pempty $ assume a, h ⟨a⟩
 
-def true_equiv_punit : true ≃ punit :=
-⟨λ x, (), λ x, trivial, λ ⟨⟩, rfl, λ ⟨⟩, rfl⟩
+def prop_equiv_punit {p : Prop} (h : p) : p ≃ punit :=
+⟨λ x, (), λ x, h, λ _, rfl, λ ⟨⟩, rfl⟩
+
+def true_equiv_punit : true ≃ punit := prop_equiv_punit trivial
 
 protected def ulift {α : Type u} : ulift α ≃ α :=
 ⟨ulift.down, ulift.up, ulift.up_down, λ a, rfl⟩
@@ -227,15 +231,14 @@ calc (false → α) ≃ (empty → α) : arrow_congr false_equiv_empty (equiv.re
 
 end
 
-@[congr] def prod_congr {α₁ β₁ α₂ β₂ : Sort*} : α₁ ≃ α₂ → β₁ ≃ β₂ → (α₁ × β₁) ≃ (α₂ × β₂)
-| ⟨f₁, g₁, l₁, r₁⟩ ⟨f₂, g₂, l₂, r₂⟩ :=
-  ⟨λ ⟨a, b⟩, (f₁ a, f₂ b), λ ⟨a, b⟩, (g₁ a, g₂ b),
-   λ ⟨a, b⟩, show (g₁ (f₁ a), g₂ (f₂ b)) = (a, b), by rw [l₁ a, l₂ b],
-   λ ⟨a, b⟩, show (f₁ (g₁ a), f₂ (g₂ b)) = (a, b), by rw [r₁ a, r₂ b]⟩
+@[congr] def prod_congr {α₁ β₁ α₂ β₂ : Sort*} (e₁ : α₁ ≃ α₂) (e₂ :β₁ ≃ β₂) : (α₁ × β₁) ≃ (α₂ × β₂) :=
+⟨λp, (e₁ p.1, e₂ p.2), λp, (e₁.symm p.1, e₂.symm p.2),
+   λ ⟨a, b⟩, show (e₁.symm (e₁ a), e₂.symm (e₂ b)) = (a, b), by rw [inverse_apply_apply, inverse_apply_apply],
+   λ ⟨a, b⟩, show (e₁ (e₁.symm a), e₂ (e₂.symm b)) = (a, b), by rw [apply_inverse_apply, apply_inverse_apply]⟩
 
 @[simp] theorem prod_congr_apply {α₁ β₁ α₂ β₂ : Sort*} (e₁ : α₁ ≃ α₂) (e₂ : β₁ ≃ β₂) (a : α₁) (b : β₁) :
   prod_congr e₁ e₂ (a, b) = (e₁ a, e₂ b) :=
-by cases e₁; cases e₂; refl
+rfl
 
 @[simp] def prod_comm (α β : Sort*) : (α × β) ≃ (β × α) :=
 ⟨λ p, (p.2, p.1), λ p, (p.2, p.1), λ⟨a, b⟩, rfl, λ⟨a, b⟩, rfl⟩
@@ -526,16 +529,24 @@ equiv_empty $ λ ⟨x, h⟩, not_mem_empty x h
 protected def pempty (α) : (∅ : set α) ≃ pempty :=
 equiv_pempty $ λ ⟨x, h⟩, not_mem_empty x h
 
-protected def union {α} {s t : set α} [decidable_pred s] (H : s ∩ t = ∅) :
-  (s ∪ t : set α) ≃ (s ⊕ t) :=
-⟨λ ⟨x, h⟩, if hs : x ∈ s then sum.inl ⟨_, hs⟩ else sum.inr ⟨_, h.resolve_left hs⟩,
+protected def union' {α} {s t : set α}
+  (p : α → Prop) [decidable_pred p]
+  (hs : ∀ x ∈ s, p x)
+  (ht : ∀ x ∈ t, ¬ p x) : (s ∪ t : set α) ≃ (s ⊕ t) :=
+⟨λ ⟨x, h⟩, if hp : p x
+  then sum.inl ⟨_, h.resolve_right (λ xt, ht _ xt hp)⟩
+  else sum.inr ⟨_, h.resolve_left (λ xs, hp (hs _ xs))⟩,
  λ o, match o with
  | (sum.inl ⟨x, h⟩) := ⟨x, or.inl h⟩
  | (sum.inr ⟨x, h⟩) := ⟨x, or.inr h⟩
  end,
- λ ⟨x, h'⟩, by by_cases x ∈ s; simp [union._match_1, union._match_2, h]; congr,
- λ o, by rcases o with ⟨x, h⟩ | ⟨x, h⟩; simp [union._match_1, union._match_2, h];
-   simp [show x ∉ s, from λ h', eq_empty_iff_forall_not_mem.1 H _ ⟨h', h⟩]⟩
+ λ ⟨x, h'⟩, by by_cases p x; simp [union'._match_1, union'._match_2, h]; congr,
+ λ o, by rcases o with ⟨x, h⟩ | ⟨x, h⟩; simp [union'._match_1, union'._match_2, h];
+   [simp [hs _ h], simp [ht _ h]]⟩
+
+protected def union {α} {s t : set α} [decidable_pred s] (H : s ∩ t = ∅) :
+  (s ∪ t : set α) ≃ (s ⊕ t) :=
+set.union' s (λ _, id) (λ x xt xs, subset_empty_iff.2 H ⟨xs, xt⟩)
 
 protected def singleton {α} (a : α) : ({a} : set α) ≃ punit.{u} :=
 ⟨λ _, punit.star, λ _, ⟨a, mem_singleton _⟩,
@@ -552,6 +563,20 @@ protected def sum_compl {α} (s : set α) [decidable_pred s] :
   (s ⊕ (-s : set α)) ≃ α :=
 (set.union (inter_compl_self _)).symm.trans
   (by rw union_compl_self; exact set.univ _)
+
+protected def union_sum_inter {α : Type u} (s t : set α) [decidable_pred s] :
+  ((s ∪ t : set α) ⊕ (s ∩ t : set α)) ≃ (s ⊕ t) :=
+calc  ((s ∪ t : set α) ⊕ (s ∩ t : set α))
+    ≃ ((s ∪ t \ s : set α) ⊕ (s ∩ t : set α)) : by rw [union_diff_self]
+... ≃ ((s ⊕ (t \ s : set α)) ⊕ (s ∩ t : set α)) :
+  sum_congr (set.union (inter_diff_self _ _)) (equiv.refl _)
+... ≃ (s ⊕ (t \ s : set α) ⊕ (s ∩ t : set α)) : sum_assoc _ _ _
+... ≃ (s ⊕ (t \ s ∪ s ∩ t : set α)) : sum_congr (equiv.refl _) begin
+    refine (set.union' (∉ s) _ _).symm,
+    exacts [λ x hx, hx.2, λ x hx, not_not_intro hx.1]
+  end
+... ≃ (s ⊕ t) : by rw (_ : t \ s ∪ s ∩ t = t);
+  rw [union_comm, inter_comm, inter_union_diff]
 
 protected def prod {α β} (s : set α) (t : set β) :
   (s.prod t) ≃ (s × t) :=
@@ -668,6 +693,7 @@ def set_value (f : α ≃ β) (a : α) (b : β) : α ≃ β :=
 by dsimp [set_value]; simp [swap_apply_left]
 
 end swap
+
 end equiv
 
 instance {α} [subsingleton α] : subsingleton (ulift α) := equiv.ulift.subsingleton

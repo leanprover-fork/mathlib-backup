@@ -119,8 +119,10 @@ l.mmap' (λ h, get_local h >>= tactic.subst) >> try (tactic.reflexivity reducibl
 
 /-- Unfold coercion-related definitions -/
 meta def unfold_coes (loc : parse location) : tactic unit :=
-unfold [``coe,``lift_t,``has_lift_t.lift,``coe_t,``has_coe_t.coe,``coe_b,``has_coe.coe,
-        ``coe_fn, ``has_coe_to_fun.coe, ``coe_sort, ``has_coe_to_sort.coe] loc
+unfold [
+  ``coe, ``coe_t, ``has_coe_t.coe, ``coe_b,``has_coe.coe,
+  ``lift, ``has_lift.lift, ``lift_t, ``has_lift_t.lift,
+  ``coe_fn, ``has_coe_to_fun.coe, ``coe_sort, ``has_coe_to_sort.coe] loc
 
 /-- Unfold auxiliary definitions associated with the current declaration. -/
 meta def unfold_aux : tactic unit :=
@@ -174,7 +176,8 @@ and `⊢ y = x`, while `congr' 2` produces the intended `⊢ x + y = y + x`. -/
 meta def congr' : parse (with_desc "n" small_nat)? → tactic unit
 | (some 0) := failed
 | o        := focus1 (assumption <|> (congr_core >>
-  all_goals (reflexivity <|> try (congr' (nat.pred <$> o)))))
+  all_goals (reflexivity <|> `[apply proof_irrel_heq] <|>
+             `[apply proof_irrel] <|> try (congr' (nat.pred <$> o)))))
 
 /--
 Acts like `have`, but removes a hypothesis with the same name as
@@ -221,7 +224,7 @@ do (hs, gex, hex, all_hyps) ← decode_simp_arg_list hs,
    let l := l.join,
    m ← list.mmap mk_const l,
    let hs := (hs ++ m).filter $ λ h, expr.const_name h ∉ gex,
-   hs ← if no_dflt then 
+   hs ← if no_dflt then
           return hs
         else
           do { congr_fun ← mk_const `congr_fun,
@@ -241,7 +244,7 @@ performing at most `max_rep` recursive steps.
 
 `solve_by_elim` performs back-tracking if `apply_assumption` chooses an unproductive assumption
 
-By default, the assumptions passed to apply_assumption are the local context, `congr_fun` and 
+By default, the assumptions passed to apply_assumption are the local context, `congr_fun` and
 `congr_arg`.
 
 `solve_by_elim [h₁, h₂, ..., hᵣ]` also applies the named lemmas.
@@ -266,10 +269,13 @@ do asms ← mk_assumption_set no_dflt hs attr_names,
 and splits a goal of the form `_ ∧ _`, `_ ↔ _` or `∃ _, _` until it can be discharged
 using `reflexivity` or `solve_by_elim`
 -/
-meta def tautology := tactic.tautology
+meta def tautology (c : parse $ (tk "!")?) := tactic.tautology c.is_some
 
 /-- Shorter name for the tactic `tautology`. -/
-meta def tauto := tautology
+meta def tauto (c : parse $ (tk "!")?) := tautology c
+
+/-- Make every propositions in the context decidable -/
+meta def classical := tactic.classical
 
 private meta def generalize_arg_p_aux : pexpr → parser (pexpr × name)
 | (app (app (macro _ [const `eq _ ]) h) (local_const x _ _ _)) := pure (h, x)
@@ -589,10 +595,10 @@ do let (e,n) := arg,
    tactic.clear asm,
    when rev.is_some (interactive.revert [n])
 
-/-- `choose names using e` assumes that `e` is a hypothesis or expression of the type
-  `∀x y z, ∃a b c, p x y z a b c`.
-It will skolemize `e` and use the names given by `ns` to assign names to the functions resulting
-from the existential quantifiers.
+/-- `choose a b h using hyp` takes an hypothesis `hyp` of the form
+`∀ (x : X) (y : Y), ∃ (a : A) (b : B), P x y a b` for some `P : X → Y → A → B → Prop` and outputs
+into context a function `a : X → Y → A`, `b : X → Y → B` and a proposition `h` stating
+`∀ (x : X) (y : Y), P x y (a x y) (b x y)`. It presumably also works with dependent versions.
 
 Example:
 
@@ -618,12 +624,3 @@ try (tactic.clear tgt)
 
 end interactive
 end tactic
-
-example (h : ∀n m : ℕ, ∃i j, m = n + i ∨ m + j = n) : true :=
-begin
-  choose i j h using show ∀n m : ℕ, ∃i j, m = n + i ∨ m + j = n, from h,
-  guard_hyp i := ℕ → ℕ → ℕ,
-  guard_hyp j := ℕ → ℕ → ℕ,
-  guard_hyp h := ∀ (n m : ℕ), m = n + i n m ∨ m + j n m = n,
-  trivial
-end

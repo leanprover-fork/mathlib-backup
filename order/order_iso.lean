@@ -21,6 +21,10 @@ definition subtype.order_embedding {X : Type*} (r : X → X → Prop) (p : X →
 ((subtype.val : subtype p → X) ⁻¹'o r) ≼o r :=
 ⟨⟨subtype.val,subtype.val_injective⟩,by intros;refl⟩
 
+theorem preimage_equivalence {α β} (f : α → β) {s : β → β → Prop}
+  (hs : equivalence s) : equivalence (f ⁻¹'o s) :=
+⟨λ a, hs.1 _, λ a b h, hs.2.1 h, λ a b c h₁ h₂, hs.2.2 h₁ h₂⟩
+
 namespace order_embedding
 
 instance : has_coe_to_fun (r ≼o s) := ⟨λ _, α → β, λ o, o.to_embedding⟩
@@ -39,13 +43,12 @@ theorem eq_of_to_fun_eq : ∀ {e₁ e₂ : r ≼o s}, (e₁ : α → β) = e₂ 
 @[refl] protected def refl (r : α → α → Prop) : r ≼o r :=
 ⟨embedding.refl _, λ a b, iff.rfl⟩
 
-@[trans] protected def trans : r ≼o s → s ≼o t → r ≼o t
-| ⟨f₁, o₁⟩ ⟨f₂, o₂⟩ := ⟨f₁.trans f₂, λ a b, by rw [o₁, o₂]; simp⟩
+@[trans] protected def trans (f : r ≼o s) (g : s ≼o t) : r ≼o t :=
+⟨f.1.trans g.1, λ a b, by rw [f.2, g.2]; simp⟩
 
 @[simp] theorem refl_apply (x : α) : order_embedding.refl r x = x := rfl
 
-@[simp] theorem trans_apply : ∀ (f : r ≼o s) (g : s ≼o t) (a : α), (f.trans g) a = g (f a)
-| ⟨f₁, o₁⟩ ⟨f₂, o₂⟩ a := rfl
+@[simp] theorem trans_apply (f : r ≼o s) (g : s ≼o t) (a : α) : (f.trans g) a = g (f a) := rfl
 
 /-- An order embedding is also an order embedding between dual orders. -/
 def rsymm (f : r ≼o s) : swap r ≼o swap s :=

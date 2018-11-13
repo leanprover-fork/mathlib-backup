@@ -16,12 +16,12 @@ def polynomial (α : Type*) [comm_semiring α] := ℕ →₀ α
 open finsupp finset lattice
 
 namespace polynomial
-universe u
-variables {α : Type u} {a b : α} {m n : ℕ}
+universes u v
+variables {α : Type u} {β : Type v} {a b : α} {m n : ℕ}
 variables [decidable_eq α]
 
 section comm_semiring
-variables [comm_semiring α] {p q : polynomial α}
+variables [comm_semiring α] {p q r : polynomial α}
 
 instance : has_zero (polynomial α) := finsupp.has_zero
 instance : has_one (polynomial α) := finsupp.has_one
@@ -79,7 +79,7 @@ lemma single_eq_C_mul_X : ∀{n}, single n a = C a * X^n
     ... = C a * X^(n+1) : by simp only [pow_add, mul_assoc, pow_one]
 
 lemma sum_C_mul_X_eq (p : polynomial α) : p.sum (λn a, C a * X^n) = p :=
-eq.trans (sum_congr rfl $ assume n hn, single_eq_C_mul_X.symm) finsupp.sum_single
+eq.trans (sum_congr rfl $ assume n hn, single_eq_C_mul_X.symm) (finsupp.sum_single _)
 
 @[elab_as_eliminator] protected lemma induction_on {M : polynomial α → Prop} (p : polynomial α)
   (h_C : ∀a, M (C a))
@@ -110,6 +110,8 @@ finsupp.induction p
 
 instance C.is_semiring_hom : is_semiring_hom (C : α → polynomial α) :=
 ⟨C_0, C_1, λ _ _, C_add, λ _ _, C_mul⟩
+
+@[simp] lemma C_pow : C (a ^ n) = C a ^ n := is_semiring_hom.map_pow _ _ _
 
 section coeff
 
@@ -157,59 +159,26 @@ by simpa only [C_1, one_mul] using coeff_C_mul_X (1:α) k n
 
 lemma coeff_mul_left (p q : polynomial α) (n : ℕ) :
   coeff (p * q) n = (range (n+1)).sum (λ k, coeff p k * coeff q (n-k)) :=
-begin
-  refine polynomial.induction_on p (λ x, _) (λ p1 p2 ih1 ih2, _) (λ pn x ih, _),
-  { refine polynomial.induction_on q (λ y, _) (λ q1 q2 ih1 ih2, _) (λ qn y ih, _),
-    { rw [sum_eq_single 0, ← C_mul, coeff_C, coeff_C, coeff_C, if_pos rfl, nat.sub_zero],
-      { by_cases h : n = 0,
-        { simp only [if_pos h] },
-        { simp only [if_neg h, mul_zero] } },
-      { intros k h1 h2, rw [coeff_C, if_neg h2, zero_mul] },
-      { exact λ h1, (h1 (mem_range.2 (nat.zero_lt_succ n))).elim } },
-    { simp only [mul_add, coeff_add],
-      -- why can't I just rw [ih1, ih2]???
-      generalize_hyp h1 : coeff (C x * q1) n = Q1 at ih1 ⊢, rw ih1,
-      generalize_hyp h2 : coeff (C x * q2) n = Q2 at ih2 ⊢, rw ih2,
-      rw finset.sum_add_distrib },
-    { rw [sum_eq_single 0, ← mul_assoc, ← C_mul, coeff_C_mul_X, coeff_C_mul_X, coeff_C, if_pos rfl, nat.sub_zero],
-      { split_ifs; simp only [h, if_pos rfl, if_false, mul_zero] },
-      { intros k h1 h2, rw [coeff_C, if_neg h2, zero_mul] },
-      { exact λ h1, (h1 (mem_range.2 (nat.zero_lt_succ n))).elim } } },
-  { simp only [add_mul, coeff_add],
-    -- why can't I just rw [ih1, ih2]???
-    generalize_hyp h1 : coeff (p1 * q) n = P1 at ih1 ⊢, rw ih1,
-    generalize_hyp h2 : coeff (p2 * q) n = P2 at ih2 ⊢, rw ih2,
-    rw finset.sum_add_distrib },
-  { refine polynomial.induction_on q (λ y, _) (λ q1 q2 ih1 ih2, _) (λ qn y ih, _),
-    { rw [sum_eq_single n, mul_right_comm, ← C_mul, coeff_C_mul_X, coeff_C_mul_X, coeff_C, if_pos (nat.sub_self _)],
-      { split_ifs with h; simp only [h, if_pos rfl, if_false, zero_mul] },
-      { intros k h1 h2, rw [coeff_C, if_neg, mul_zero],
-        refine mt (λ H, le_antisymm (nat.le_of_lt_succ (mem_range.1 h1)) (nat.sub_eq_zero_iff_le.1 H)) h2 },
-      { exact λ h1, (h1 (mem_range.2 (le_refl (n+1)))).elim } },
-    { simp only [mul_add, coeff_add],
-      generalize_hyp h1 : coeff (C x * X ^ (pn + 1) * q1) n = Q1 at ih1 ⊢, rw ih1,
-      generalize_hyp h2 : coeff (C x * X ^ (pn + 1) * q2) n = Q2 at ih2 ⊢, rw ih2,
-      rw finset.sum_add_distrib },
-    { rw [mul_left_comm, mul_assoc, ← pow_add, ← mul_assoc, ← C_mul],
-      rw [sum_eq_single (pn + 1), coeff_C_mul_X, coeff_C_mul_X, coeff_C_mul_X, if_pos rfl],
-      { have H : n = pn + 1 + (qn + 1) ↔ n - (pn + 1) = qn + 1,
-        { split, { intro H, rw [H, nat.add_sub_cancel_left] },
-          intro H,
-          have H1 : pn + 1 < n,
-          { refine lt_of_not_ge (λ H1, _),
-            rw [nat.sub_eq_zero_of_le H1] at H,
-            exact nat.succ_ne_zero qn H.symm },
-          rw [(nat.sub_eq_iff_eq_add (le_of_lt H1)).1 H, add_comm] },
-        split_ifs with h,
-        { rw [if_pos (H.1 h), mul_comm] },
-        { rw [if_neg (mt H.2 h), mul_zero] } },
-      { intros k h1 h2, rw [coeff_C_mul_X, if_neg h2, zero_mul] },
-      { intro H,
-        rw [coeff_C_mul_X, if_pos rfl, coeff_C_mul_X, if_neg, mul_zero],
-        rw [mem_range, not_lt] at H,
-        rw [nat.sub_eq_zero_of_le (le_of_lt H)],
-        exact ne.symm (nat.succ_ne_zero _) } } }
-end
+have hite : ∀ a : ℕ × ℕ, ite (a.1 + a.2 = n) (coeff p (a.fst) * coeff q (a.snd)) 0 ≠ 0
+    → a.1 + a.2 = n, from λ a ha, by_contradiction
+  (λ h, absurd (eq.refl (0 : α)) (by rwa if_neg h at ha)),
+calc coeff (p * q) n = sum (p.support) (λ a, sum (q.support)
+    (λ b, ite (a + b = n) (coeff p a * coeff q b) 0)) :
+  by simp only [finsupp.mul_def, coeff_sum, coeff_single]; refl
+... = (p.support.product q.support).sum
+    (λ v : ℕ × ℕ, ite (v.1 + v.2 = n) (coeff p v.1 * coeff q v.2) 0) :
+  by rw sum_product
+... = (range (n+1)).sum (λ k, coeff p k * coeff q (n-k)) :
+  sum_bij_ne_zero (λ a _ _, a.1)
+  (λ a _ ha, mem_range.2 (nat.lt_succ_of_le (hite a ha ▸ le_add_right (le_refl _))))
+  (λ a₁ a₂ _ h₁ _ h₂ h, prod.ext h
+    ((add_left_inj a₁.1).1 (by rw [hite a₁ h₁, h, hite a₂ h₂])))
+  (λ a h₁ h₂, ⟨(a, n - a), mem_product.2
+      ⟨mem_support_iff.2 (ne_zero_of_mul_ne_zero_right h₂),
+      mem_support_iff.2 (ne_zero_of_mul_ne_zero_left h₂)⟩,
+    by simpa [nat.add_sub_cancel' (nat.le_of_lt_succ (mem_range.1 h₁))],
+    rfl⟩)
+  (λ a _ ha, by rw [← hite a ha, if_pos rfl, nat.add_sub_cancel_left])
 
 lemma coeff_mul_right (p q : polynomial α) (n : ℕ) :
   coeff (p * q) n = (range (n+1)).sum (λ k, coeff p (n-k) * coeff q k) :=
@@ -237,14 +206,16 @@ lemma C_inj : C a = C b ↔ a = b :=
 ⟨λ h, coeff_C_zero.symm.trans (h.symm ▸ coeff_C_zero), congr_arg C⟩
 
 section eval₂
-variables {β : Type*} [comm_semiring β]
-variables (f : α → β) [is_semiring_hom f] (x : β)
+variables [semiring β]
+variables (f : α → β) (x : β)
 open is_semiring_hom
 
 /-- Evaluate a polynomial `p` given a ring hom `f` from the scalar ring
   to the target and a value `x` for the variable in the target -/
 def eval₂ (p : polynomial α) : β :=
 p.sum (λ e a, f a * x ^ e)
+
+variables [is_semiring_hom f]
 
 @[simp] lemma eval₂_C : (C a).eval₂ f x = f a :=
 (sum_single_index $ by rw [map_zero f, zero_mul]).trans $ by rw [pow_zero, mul_one]
@@ -262,6 +233,16 @@ finsupp.sum_add_index
 
 @[simp] lemma eval₂_one : (1 : polynomial α).eval₂ f x = 1 :=
 by rw [← C_1, eval₂_C, map_one f]
+
+instance eval₂.is_add_monoid_hom : is_add_monoid_hom (eval₂ f x) :=
+⟨eval₂_zero _ _, λ _ _, eval₂_add _ _⟩
+
+end eval₂
+
+section eval₂
+variables [comm_semiring β]
+variables (f : α → β) [is_semiring_hom f] (x : β)
+open is_semiring_hom
 
 @[simp] lemma eval₂_mul : (p * q).eval₂ f x = p.eval₂ f x * q.eval₂ f x :=
 begin
@@ -282,6 +263,11 @@ instance eval₂.is_semiring_hom : is_semiring_hom (eval₂ f x) :=
 ⟨eval₂_zero _ _, eval₂_one _ _, λ _ _, eval₂_add _ _, λ _ _, eval₂_mul _ _⟩
 
 lemma eval₂_pow (n : ℕ) : (p ^ n).eval₂ f x = p.eval₂ f x ^ n := map_pow _ _ _
+
+lemma eval₂_sum (p : polynomial α) (g : ℕ → α → polynomial α) (x : β) :
+  (p.sum g).eval₂ f x = p.sum (λ n a, (g n a).eval₂ f x) :=
+finsupp.sum_sum_index (by simp [is_add_monoid_hom.map_zero f])
+  (by intros; simp [right_distrib, is_add_monoid_hom.map_add f])
 
 end eval₂
 
@@ -307,6 +293,10 @@ instance eval.is_semiring_hom : is_semiring_hom (eval x) := eval₂.is_semiring_
 
 lemma eval_pow (n : ℕ) : (p ^ n).eval x = p.eval x ^ n := eval₂_pow _ _ _
 
+lemma eval_sum (p : polynomial α) (f : ℕ → α → polynomial α) (x : α) :
+  (p.sum f).eval x = p.sum (λ n a, (f n a).eval x) :=
+eval₂_sum _ _ _ _
+
 /-- `is_root p x` implies `x` is a root of `p`. The evaluation of `p` at `x` is zero -/
 def is_root (p : polynomial α) (a : α) : Prop := p.eval a = 0
 
@@ -322,14 +312,60 @@ lemma root_mul_right_of_is_root {p : polynomial α} (q : polynomial α) :
   is_root p a → is_root (p * q) a :=
 λ H, by rw [is_root, eval_mul, is_root.def.1 H, zero_mul]
 
-lemma eval_sum (p : polynomial α) (f : ℕ → α → polynomial α) (x : α) :
-  (p.sum f).eval x = p.sum (λ n a, (f n a).eval x) :=
-finsupp.sum_sum_index (by simp) (by intros; simp [right_distrib])
-
 end eval
 
+section comp
+
+def comp (p q : polynomial α) : polynomial α := p.eval₂ C q
+
+lemma eval₂_comp [comm_semiring β] (f : α → β) [is_semiring_hom f] {x : β} :
+  (p.comp q).eval₂ f x = p.eval₂ f (q.eval₂ f x) :=
+show (p.sum (λ e a, C a * q ^ e)).eval₂ f x = p.eval₂ f (eval₂ f x q),
+by simp only [eval₂_mul, eval₂_C, eval₂_pow, eval₂_sum]; refl
+
+lemma eval_comp : (p.comp q).eval a = p.eval (q.eval a) := eval₂_comp _
+
+@[simp] lemma comp_X : p.comp X = p :=
+begin
+  refine polynomial.ext.2 (λ n, _),
+  rw [comp, eval₂],
+  conv in (C _ * _) { rw ← single_eq_C_mul_X },
+  rw finsupp.sum_single
+end
+
+@[simp] lemma X_comp : X.comp p = p := eval₂_X _ _
+
+@[simp] lemma comp_C : p.comp (C a) = C (p.eval a) :=
+begin
+  dsimp [comp, eval₂, eval, finsupp.sum],
+  rw [← sum_hom C (@C_0 α _ _) (λ _ _, @C_add _ _ _ _ _)],
+  apply finset.sum_congr rfl; simp
+end
+
+@[simp] lemma C_comp : (C a).comp p = C a := eval₂_C _ _
+
+@[simp] lemma comp_zero : p.comp (0 : polynomial α) = C (p.eval 0) :=
+by rw [← C_0, comp_C]
+
+@[simp] lemma zero_comp : comp (0 : polynomial α) p = 0 :=
+by rw [← C_0, C_comp]
+
+@[simp] lemma comp_one : p.comp 1 = C (p.eval 1) :=
+by rw [← C_1, comp_C]
+
+@[simp] lemma one_comp : comp (1 : polynomial α) p = 1 :=
+by rw [← C_1, C_comp]
+
+instance : is_semiring_hom (λ q : polynomial α, q.comp p) :=
+by unfold comp; apply_instance
+
+@[simp] lemma add_comp : (p + q).comp r = p.comp r + q.comp r := eval₂_add _ _
+@[simp] lemma mul_comp : (p * q).comp r = p.comp r * q.comp r := eval₂_mul _ _
+
+end comp
+
 section map
-variables {β : Type*} [comm_semiring β] [decidable_eq β]
+variables [comm_semiring β] [decidable_eq β]
 variables (f : α → β) [is_semiring_hom f]
 
 /-- `map f p` maps a polynomial `p` across a ring hom `f` -/
@@ -498,8 +534,8 @@ lemma degree_erase_lt (hp : p ≠ 0) : degree (p.erase (nat_degree p)) < degree 
 lt_of_le_of_ne (degree_erase_le _ _) $
   (degree_eq_nat_degree hp).symm ▸ λ h, not_mem_erase _ _ (mem_of_max h)
 
-lemma degree_sum_le {β : Type*} [decidable_eq β] (s : finset β) (f : β → polynomial α) :
-  degree (s.sum f) ≤ s.sup (degree ∘ f) :=
+lemma degree_sum_le [decidable_eq β] (s : finset β) (f : β → polynomial α) :
+  degree (s.sum f) ≤ s.sup (λ b, degree (f b)) :=
 finset.induction_on s (by simp only [sum_empty, sup_empty, degree_zero, le_refl]) $
   assume a s has ih,
   calc degree (sum (insert a s) f) ≤ max (degree (f a)) (degree (s.sum f)) :
@@ -645,7 +681,7 @@ variables [comm_ring α] {p q : polynomial α}
 instance : comm_ring (polynomial α) := finsupp.to_comm_ring
 instance : has_scalar α (polynomial α) := finsupp.to_has_scalar
 -- TODO if this becomes a semimodule then the below lemma could be proved for semimodules
-instance : module α (polynomial α) := finsupp.to_module α
+instance : module α (polynomial α) := finsupp.to_module ℕ α
 
 -- TODO -- this is OK for semimodules
 @[simp] lemma coeff_smul (p : polynomial α) (r : α) (n : ℕ) :
@@ -655,10 +691,14 @@ coeff (r • p) n = r * coeff p n := finsupp.smul_apply
 lemma C_mul' (a : α) (f : polynomial α) : C a * f = a • f :=
 ext.2 $ λ n, coeff_C_mul f
 
--- TODO -- this is OK for semimodules
-lemma coeff_is_linear (n : ℕ) : is_linear_map (λ f : polynomial α, coeff f n) :=
-{ add := λ f g, coeff_add f g n,
+variable (α)
+def lcoeff (n : ℕ) : polynomial α →ₗ α :=
+{ to_fun := λ f, coeff f n,
+  add := λ f g, coeff_add f g n,
   smul := λ r p, coeff_smul p r n }
+variable {α}
+
+@[simp] lemma lcoeff_apply (n : ℕ) (f : polynomial α) : lcoeff α n f = coeff f n := rfl
 
 instance C.is_ring_hom : is_ring_hom (@C α _ _) := by apply is_ring_hom.of_semiring
 
@@ -916,6 +956,15 @@ lemma dvd_iff_mod_by_monic_eq_zero (hq : monic q) : p %ₘ q = 0 ↔ q ∣ p :=
       degree_eq_nat_degree (mt leading_coeff_eq_zero.2 hrpq0)] at this;
     exact not_lt_of_ge (nat.le_add_right _ _) (with_bot.some_lt_some.1 this))⟩
 
+lemma degree_pos_of_root (hp : p ≠ 0) (h : is_root p a) : 0 < degree p :=
+lt_of_not_ge $ λ hlt, begin
+  have := eq_C_of_degree_le_zero hlt,
+  rw [is_root, this, eval_C] at h,
+  exact hp (finsupp.ext (λ n, show coeff p n = 0, from
+    nat.cases_on n h (λ _, coeff_eq_zero_of_degree_lt (lt_of_le_of_lt hlt
+      (with_bot.coe_lt_coe.2 (nat.succ_pos _)))))),
+end
+
 end comm_ring
 
 section nonzero_comm_ring
@@ -1059,15 +1108,6 @@ lemma root_or_root_of_root_mul (h : is_root (p * q) a) : is_root p a ∨ is_root
 by rw [is_root, eval_mul] at h;
   exact eq_zero_or_eq_zero_of_mul_eq_zero h
 
-lemma degree_pos_of_root (hp : p ≠ 0) (h : is_root p a) : 0 < degree p :=
-lt_of_not_ge $ λ hlt, begin
-  have := eq_C_of_degree_le_zero hlt,
-  rw [is_root, this, eval_C] at h,
-  exact hp (finsupp.ext (λ n, show coeff p n = 0, from
-    nat.cases_on n h (λ _, coeff_eq_zero_of_degree_lt (lt_of_le_of_lt hlt
-      (with_bot.coe_lt_coe.2 (nat.succ_pos _)))))),
-end
-
 lemma degree_le_mul_left (p : polynomial α) (hq : q ≠ 0) : degree p ≤ degree (p * q) :=
 if hp : p = 0 then by simp only [hp, zero_mul, le_refl]
 else by rw [degree_mul_eq, degree_eq_nat_degree hp,
@@ -1159,9 +1199,9 @@ else by rw [← with_bot.coe_le_coe, ← degree_X_pow_sub_C (nat.pos_of_ne_zero 
 end integral_domain
 
 section field
-variables [field α] {p q : polynomial α}
+variables [discrete_field α] {p q : polynomial α}
 instance : vector_space α (polynomial α) :=
-{ ..finsupp.to_module α }
+{ ..finsupp.to_module ℕ α }
 
 lemma monic_mul_leading_coeff_inv (h : p ≠ 0) :
   monic (p * C (leading_coeff p)⁻¹) :=
@@ -1254,7 +1294,7 @@ by conv {to_rhs, rw [← euclidean_domain.div_add_mod p q, add_comm,
 end field
 
 section derivative
-variables [comm_semiring α] {β : Type*}
+variables [comm_semiring α]
 
 /-- `derivative p` formal derivative of the polynomial `p` -/
 def derivative (p : polynomial α) : polynomial α := p.sum (λn a, C (a * n) * X^(n - 1))
@@ -1370,7 +1410,10 @@ end domain
 section identities
 
 /- @TODO: pow_add_expansion and pow_sub_pow_factor are not specific to polynomials.
-  These belong somewhere else. But not in group_power because they depend on tactic.ring -/
+  These belong somewhere else. But not in group_power because they depend on tactic.ring
+
+Maybe use data.nat.choose to prove it.
+ -/
 
 def pow_add_expansion {α : Type*} [comm_semiring α] (x y : α) : ∀ (n : ℕ),
   {k // (x + y)^n = x^n + n*x^(n-1)*y + k * y^2}

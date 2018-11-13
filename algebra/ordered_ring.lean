@@ -3,7 +3,7 @@ Copyright (c) 2017 Mario Carneiro. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Mario Carneiro
 -/
-import order.basic algebra.order algebra.ordered_group algebra.ring
+import order.basic algebra.order algebra.ordered_group algebra.ring data.nat.cast
 
 universe u
 variable {α : Type u}
@@ -82,6 +82,32 @@ lemma one_lt_mul {a b : α} (ha : 1 ≤ a) (hb : 1 < b) : 1 < a * b :=
 
 lemma mul_le_one {a b : α} (ha : a ≤ 1) (hb' : 0 ≤ b) (hb : b ≤ 1) : a * b ≤ 1 :=
 begin rw ← one_mul (1 : α), apply mul_le_mul; {assumption <|> apply zero_le_one} end
+
+lemma one_lt_mul_of_le_of_lt {a b : α} (ha : 1 ≤ a) (hb : 1 < b) : 1 < a * b :=
+calc 1 = 1 * 1 : by rw one_mul
+... < a * b : mul_lt_mul' ha hb zero_le_one (lt_of_lt_of_le zero_lt_one ha)
+
+lemma one_lt_mul_of_lt_of_le {a b : α} (ha : 1 < a) (hb : 1 ≤ b) : 1 < a * b :=
+calc 1 = 1 * 1 : by rw one_mul
+... < a * b : mul_lt_mul ha hb zero_lt_one (le_trans zero_le_one (le_of_lt ha))
+
+lemma mul_le_of_le_one_right {a b : α} (ha : 0 ≤ a) (hb1 : b ≤ 1) : a * b ≤ a :=
+calc a * b ≤ a * 1 : mul_le_mul_of_nonneg_left hb1 ha
+... = a : mul_one a
+
+lemma mul_le_of_le_one_left {a b : α} (hb : 0 ≤ b) (ha1 : a ≤ 1) : a * b ≤ b :=
+calc a * b ≤ 1 * b : mul_le_mul ha1 (le_refl b) hb zero_le_one
+... = b : one_mul b
+
+lemma mul_lt_one_of_nonneg_of_lt_one_left {a b : α}
+  (ha0 : 0 ≤ a) (ha : a < 1) (hb : b ≤ 1) : a * b < 1 :=
+calc a * b ≤ a : mul_le_of_le_one_right ha0 hb
+... < 1 : ha
+
+lemma mul_lt_one_of_nonneg_of_lt_one_right {a b : α}
+  (ha : a ≤ 1) (hb0 : 0 ≤ b) (hb : b < 1) : a * b < 1 :=
+calc a * b ≤ b : mul_le_of_le_one_left hb0 ha
+... < 1 : hb
 
 lemma mul_le_iff_le_one_left {a b : α} (hb : b > 0) : a * b ≤ b ↔ a ≤ 1 :=
 ⟨ λ h, le_of_not_lt (mt (lt_mul_iff_one_lt_left hb).2 (not_lt_of_ge h)),
@@ -386,5 +412,16 @@ instance [canonically_ordered_comm_semiring α] [decidable_eq α] :
   mul_one         := assume a, by rw [comm, one_mul'],
   zero_ne_one     := assume h, @zero_ne_one α _ $ option.some.inj h,
   .. with_top.add_comm_monoid, .. with_top.mul_zero_class, .. with_top.canonically_ordered_monoid }
+
+@[simp] lemma coe_nat : ∀(n : nat), ((n : α) : with_top α) = n
+| 0     := rfl
+| (n+1) := have (((1 : nat) : α) : with_top α) = ((1 : nat) : with_top α) := rfl,
+           by rw [nat.cast_add, coe_add, nat.cast_add, coe_nat n, this]
+
+@[simp] lemma nat_ne_top (n : nat) : (n : with_top α ) ≠ ⊤ :=
+by rw [←coe_nat n]; apply coe_ne_top
+
+@[simp] lemma top_ne_nat (n : nat) : (⊤ : with_top α) ≠ n :=
+by rw [←coe_nat n]; apply top_ne_coe
 
 end with_top

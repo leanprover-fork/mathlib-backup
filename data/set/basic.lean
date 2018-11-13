@@ -160,6 +160,9 @@ by haveI := classical.prop_decidable;
 theorem exists_mem_of_ne_empty {s : set α} : s ≠ ∅ → ∃ x, x ∈ s :=
 ne_empty_iff_exists_mem.1
 
+theorem coe_nonempty_iff_ne_empty {s : set α} : nonempty s ↔ s ≠ ∅ :=
+nonempty_subtype.trans ne_empty_iff_exists_mem.symm
+
 -- TODO: remove when simplifier stops rewriting `a ≠ b` to `¬ a = b`
 theorem not_eq_empty_iff_exists {s : set α} : ¬ (s = ∅) ↔ ∃ x, x ∈ s :=
 ne_empty_iff_exists_mem
@@ -515,6 +518,8 @@ set.ext $ by simp
 /- complement -/
 
 theorem mem_compl {s : set α} {x : α} (h : x ∉ s) : x ∈ -s := h
+
+lemma compl_set_of {α} (p : α → Prop) : - {a | p a} = { a | ¬ p a } := rfl
 
 theorem not_mem_of_mem_compl {s : set α} {x : α} (h : x ∈ -s) : x ∉ s := h
 
@@ -948,6 +953,16 @@ end
 lemma injective_image {f : α → β} (hf : injective f) : injective (('') f) :=
 assume s t, (image_eq_image hf).1
 
+lemma prod_quotient_preimage_eq_image [s : setoid α] (g : quotient s → β) {h : α → β}
+  (Hh : h = g ∘ quotient.mk) (r : set (β × β)) :
+  {x : quotient s × quotient s | (g x.1, g x.2) ∈ r} =
+  (λ a : α × α, (⟦a.1⟧, ⟦a.2⟧)) '' ((λ a : α × α, (h a.1, h a.2)) ⁻¹' r) :=
+Hh.symm ▸ set.ext (λ ⟨a₁, a₂⟩, ⟨quotient.induction_on₂ a₁ a₂
+  (λ a₁ a₂ h, ⟨(a₁, a₂), h, rfl⟩),
+  λ ⟨⟨b₁, b₂⟩, h₁, h₂⟩, show (g a₁, g a₂) ∈ r, from
+  have h₃ : ⟦b₁⟧ = a₁ ∧ ⟦b₂⟧ = a₂ := prod.ext_iff.1 h₂,
+    h₃.1 ▸ h₃.2 ▸ h₁⟩)
+
 end image
 
 theorem univ_eq_true_false : univ = ({true, false} : set Prop) :=
@@ -970,6 +985,9 @@ theorem mem_range_self (i : ι) : f i ∈ range f := ⟨i, rfl⟩
 theorem forall_range_iff {p : α → Prop} : (∀ a ∈ range f, p a) ↔ (∀ i, p (f i)) :=
 ⟨assume h i, h (f i) (mem_range_self _), assume h a ⟨i, (hi : f i = a)⟩, hi ▸ h i⟩
 
+theorem exists_range_iff {p : α → Prop} : (∃ a ∈ range f, p a) ↔ (∃ i, p (f i)) :=
+⟨assume ⟨a, ⟨i, eq⟩, h⟩, ⟨i, eq.symm ▸ h⟩, assume ⟨i, h⟩, ⟨f i, mem_range_self _, h⟩⟩
+
 theorem range_iff_surjective : range f = univ ↔ surjective f :=
 eq_univ_iff_forall
 
@@ -977,6 +995,9 @@ eq_univ_iff_forall
 
 @[simp] theorem image_univ {ι : Type*} {f : ι → β} : f '' univ = range f :=
 ext $ by simp [image, range]
+
+theorem image_subset_range {ι : Type*} (f : ι → β) (s : set ι) : f '' s ⊆ range f :=
+by rw ← image_univ; exact image_subset _ (subset_univ _)
 
 theorem range_comp {g : α → β} : range (g ∘ f) = g '' range f :=
 subset.antisymm
@@ -994,21 +1015,37 @@ begin
 end
 
 theorem image_preimage_eq_inter_range {f : α → β} {t : set β} :
-  f '' preimage f t = t ∩ range f :=
+  f '' (f ⁻¹' t) = t ∩ range f :=
 ext $ assume x, ⟨assume ⟨x, hx, heq⟩, heq ▸ ⟨hx, mem_range_self _⟩,
   assume ⟨hx, ⟨y, h_eq⟩⟩, h_eq ▸ mem_image_of_mem f $
-    show y ∈ preimage f t, by simp [preimage, h_eq, hx]⟩
+    show y ∈ f ⁻¹' t, by simp [preimage, h_eq, hx]⟩
+
+theorem preimage_inter_range {f : α → β} {s : set β} : f ⁻¹' (s ∩ range f) = f ⁻¹' s :=
+set.ext $ λ x, and_iff_left ⟨x, rfl⟩
+
+theorem preimage_image_preimage {f : α → β} {s : set β} :
+  f ⁻¹' (f '' (f ⁻¹' s)) = f ⁻¹' s :=
+by rw [image_preimage_eq_inter_range, preimage_inter_range]
 
 @[simp] theorem quot_mk_range_eq [setoid α] : range (λx : α, ⟦x⟧) = univ :=
 range_iff_surjective.2 quot.exists_rep
-end range
 
 lemma subtype_val_range {p : α → Prop} :
   range (@subtype.val _ p) = {x | p x} :=
 by rw ← image_univ; simp [-image_univ, subtype_val_image]
 
+end range
+
 /-- The set `s` is pairwise `r` if `r x y` for all *distinct* `x y ∈ s`. -/
 def pairwise_on (s : set α) (r : α → α → Prop) := ∀ x ∈ s, ∀ y ∈ s, x ≠ y → r x y
+
+theorem pairwise_on.mono {s t : set α} {r}
+  (h : t ⊆ s) (hp : pairwise_on s r) : pairwise_on t r :=
+λ x xt y yt, hp x (h xt) y (h yt)
+
+theorem pairwise_on.mono' {s : set α} {r r' : α → α → Prop}
+  (H : ∀ a b, r a b → r' a b) (hp : pairwise_on s r) : pairwise_on s r' :=
+λ x xs y ys h, H _ _ (hp x xs y ys h)
 
 end set
 

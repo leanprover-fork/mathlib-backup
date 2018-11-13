@@ -21,7 +21,7 @@ begin
   intros s lfs os,
   suffices : ∃ (a : ℕ), ∀ (b : ℕ), b ≥ a → f b ∈ s, by simpa using this,
   rcases is_open_metric.1 os _ lfs with ⟨ε, ⟨hε, hεs⟩⟩,
-  cases cau_seq.lim_spec f _ hε with N hN,
+  cases setoid.symm (cau_seq.equiv_lim f) _ hε with N hN,
   existsi N,
   intros b hb,
   apply hεs,
@@ -180,7 +180,7 @@ variable [cau_seq.is_complete β norm]
 noncomputable def cau_filter_lim : β := cau_seq.lim (cau_seq_of_cau_filter hf)
 
 lemma cau_filter_lim_spec : ∀ ε > 0, ∃ N : ℕ, ∀ n ≥ N, ∥cau_filter_lim hf - cau_seq_of_cau_filter hf n∥ < ε :=
-cau_seq.lim_spec _
+setoid.symm $ cau_seq.equiv_lim _
 
 /-
 Let lim be the limit of the Cauchy sequence seq that is derived from the Cauchy filter f.
@@ -223,7 +223,7 @@ begin
   rw [←dist_eq_norm, dist_comm] at hdist2,
   have hdist : dist x (cau_filter_lim hf) < ε,
   { apply lt_of_le_of_lt,
-    { apply metric_space.dist_triangle,
+    { apply dist_triangle,
       exact (cau_seq_of_cau_filter hf) N },
     { rw ←add_halves ε,
       apply add_lt_add; assumption }},

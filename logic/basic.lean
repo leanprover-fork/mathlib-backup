@@ -510,6 +510,8 @@ or_iff_not_imp_left
 protected theorem or_iff_not_imp_right {p q : Prop} : q ∨ p ↔ (¬ p → q) :=
 or_iff_not_imp_right
 
+protected lemma not_not {p : Prop} : ¬¬p ↔ p := not_not
+
 /- use shortened names to avoid conflict when classical namespace is open -/
 noncomputable theorem dec (p : Prop) : decidable p := by apply_instance
 noncomputable theorem dec_pred (p : α → Prop) : decidable_pred p := by apply_instance
@@ -517,14 +519,19 @@ noncomputable theorem dec_rel (p : α → α → Prop) : decidable_rel p := by a
 noncomputable theorem dec_eq (α : Sort*) : decidable_eq α := by apply_instance
 
 @[elab_as_eliminator]
-noncomputable def {u} rec_on {C : Sort u} (h : ∃ a, p a) (H : ∀ a, p a → C) : C :=
-H (classical.some h) (classical.some_spec h)
+noncomputable def {u} exists_cases {C : Sort u} (H0 : C) (H : ∀ a, p a → C) : C :=
+if h : ∃ a, p a then H (classical.some h) (classical.some_spec h) else H0
 
 lemma some_spec2 {α : Type*} {p : α → Prop} {h : ∃a, p a}
   (q : α → Prop) (hpq : ∀a, p a → q a) : q (some h) :=
 hpq _ $ some_spec _
 
 end classical
+
+@[elab_as_eliminator]
+noncomputable def {u} exists.classical_rec_on
+ {α} {p : α → Prop} (h : ∃ a, p a) {C : Sort u} (H : ∀ a, p a → C) : C :=
+H (classical.some h) (classical.some_spec h)
 
 /-
    bounded quantifiers

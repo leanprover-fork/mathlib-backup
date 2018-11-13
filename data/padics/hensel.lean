@@ -7,8 +7,9 @@ A proof of Hensel's lemma on ℤ_p, roughly following Keith Conrad's writeup:
 http://www.math.uconn.edu/~kconrad/blurbs/gradnumthy/hensel.pdf
 -/
 
-import data.padics.padic_integers data.polynomial data.nat.binomial data.real.cau_seq_filter
-       analysis.limits analysis.polynomial tactic.ring
+import data.padics.padic_integers data.polynomial data.nat.choose data.real.cau_seq_filter
+import analysis.limits analysis.polynomial
+import tactic.ring
 
 noncomputable theory
 
@@ -77,7 +78,7 @@ lt_of_le_of_lt (norm_nonneg _) hnorm
 private lemma deriv_sq_norm_ne_zero : ∥F.derivative.eval a∥^2 ≠ 0 := ne_of_gt deriv_sq_norm_pos
 
 private lemma deriv_norm_ne_zero : ∥F.derivative.eval a∥ ≠ 0 :=
-λ h, deriv_sq_norm_ne_zero (by simp *; refl)
+λ h, deriv_sq_norm_ne_zero (by simp [*, _root_.pow_two])
 
 private lemma deriv_norm_pos : 0 < ∥F.derivative.eval a∥ :=
 lt_of_le_of_ne (norm_nonneg _) (ne.symm deriv_norm_ne_zero)
@@ -324,7 +325,7 @@ private def soln : ℤ_[p] := newton_cau_seq.lim
 
 private lemma soln_spec {ε : ℝ} (hε : ε > 0) :
   ∃ (N : ℕ), ∀ {i : ℕ}, i ≥ N → ∥soln - newton_cau_seq i∥ < ε :=
-cau_seq.lim_spec newton_cau_seq _ hε
+setoid.symm (cau_seq.equiv_lim newton_cau_seq) _ hε
 
 private lemma soln_deriv_norm : ∥F.derivative.eval soln∥ = ∥F.derivative.eval a∥ :=
 norm_deriv_eq newton_seq_deriv_norm

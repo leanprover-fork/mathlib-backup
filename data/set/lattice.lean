@@ -280,6 +280,9 @@ supr_univ
 @[simp] theorem bUnion_singleton (a : α) (s : α → set β) : (⋃ x ∈ ({a} : set α), s x) = s a :=
 supr_singleton
 
+@[simp] theorem bUnion_of_singleton (s : set α) : (⋃ x ∈ s, {x}) = s :=
+ext $ by simp
+
 theorem bUnion_union (s t : set α) (u : α → set β) :
   (⋃ x ∈ s ∪ t, u x) = (⋃ x ∈ s, u x) ∪ (⋃ x ∈ t, u x) :=
 supr_union
@@ -424,6 +427,10 @@ lemma Union_subset_Union2 {ι₂ : Sort*} {s : ι → set α} {t : ι₂ → set
 lemma Union_subset_Union_const {ι₂ : Sort x} {s : set α} (h : ι → ι₂) : (⋃ i:ι, s) ⊆ (⋃ j:ι₂, s) :=
 @supr_le_supr_const (set α) ι ι₂ _ s h
 
+theorem bUnion_subset_Union (s : set α) (t : α → set β) :
+  (⋃ x ∈ s, t x) ⊆ (⋃ x, t x) :=
+Union_subset_Union $ λ i, Union_subset $ λ h, by refl
+
 lemma sUnion_eq_bUnion {s : set (set α)} : (⋃₀ s) = (⋃ (i : set α) (h : i ∈ s), i) :=
 set.ext $ by simp
 
@@ -500,9 +507,21 @@ theorem monotone_preimage {f : α → β} : monotone (preimage f) := assume a b 
   preimage f (⋃i, s i) = (⋃i, preimage f (s i)) :=
 set.ext $ by simp [preimage]
 
+theorem preimage_bUnion {ι} {f : α → β} {s : set ι} {t : ι → set β} :
+  preimage f (⋃i ∈ s, t i) = (⋃i ∈ s, preimage f (t i)) :=
+by simp
+
 @[simp] theorem preimage_sUnion {f : α → β} {s : set (set β)} :
   preimage f (⋃₀ s) = (⋃t ∈ s, preimage f t) :=
 set.ext $ by simp [preimage]
+
+lemma preimage_Inter {ι : Sort*} {s : ι → set β} {f : α → β} :
+  f ⁻¹' (⋂ i, s i) = (⋂ i, f ⁻¹' s i) :=
+by ext; simp
+
+lemma preimage_bInter {s : γ → set β} {t : set γ} {f : α → β} :
+  f ⁻¹' (⋂ i∈t, s i) = (⋂ i∈t, f ⁻¹' s i) :=
+by ext; simp
 
 end preimage
 
@@ -628,8 +647,8 @@ by rw [disjoint, disjoint, inf_comm]
 theorem disjoint.symm {a b : α} : disjoint a b → disjoint b a :=
 disjoint.comm.1
 
-theorem disjoint_bot_left {a : α} : disjoint ⊥ a := disjoint_iff.2 bot_inf_eq
-theorem disjoint_bot_right {a : α} : disjoint a ⊥ := disjoint_iff.2 inf_bot_eq
+@[simp] theorem disjoint_bot_left {a : α} : disjoint ⊥ a := disjoint_iff.2 bot_inf_eq
+@[simp] theorem disjoint_bot_right {a : α} : disjoint a ⊥ := disjoint_iff.2 inf_bot_eq
 
 theorem disjoint_mono {a b c d : α} (h₁ : a ≤ b) (h₂ : c ≤ d) :
   disjoint b d → disjoint a c := le_trans (inf_le_inf h₁ h₂)
