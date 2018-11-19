@@ -12,7 +12,7 @@ TODO(Jeremy): extend this to partial functions `f`? It is a pain in the neck: we
 def has_derivative_at_within (f : E → F) (x : E) (s : set E) (f' : E → F) :=
 is_bounded_linear_map f' ∧ 
   tendsto (λ x', ∥x' - x∥⁻¹ • (f x' - f x - f' (x' - x)))
-    (at_within x s) (nhds 0)
+    (nhds_within x s) (nhds 0)
 
 def has_derivative_at (f : E → F) (x : E) (f' : E → F) [is_bounded_linear_map f'] :=
 has_derivative_at_within f x set.univ f' 

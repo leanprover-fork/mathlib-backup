@@ -11,6 +11,7 @@ import order.filter
 import analysis.topology.topological_space
 import analysis.metric_space
 import tactic.squeeze
+import order.complete_lattice
 
 variables {α : Type*} {β : Type*} {γ : Type*}
 
@@ -37,6 +38,9 @@ def rel (α : Type*) (β : Type*):= α → β → Prop
 namespace rel
 
 variables {δ : Type*} (r : rel α β)
+
+instance : lattice.complete_lattice (rel α β) :=
+by unfold rel; apply_instance
 
 def inv : rel β α := flip r
 
@@ -363,6 +367,18 @@ theorem map_comap_of_surjective {f : α → β} (hf : function.surjective f) (l 
   map f (comap f l) = l :=
 le_antisymm map_comap_le (le_map_comap_of_surjective hf l)
 
+theorem mem_inf_principal (l : filter α) (s t : set α) : 
+  s ∈ (l ⊓ principal t).sets ↔ { x | x ∈ t → x ∈ s } ∈ l.sets :=
+begin
+  simp only [mem_inf_sets, mem_principal_sets, exists_prop], split,
+  { rintros ⟨u, ul, v, tsubv, uvinter⟩,
+    apply filter.mem_sets_of_superset ul,
+    intros x xu xt, exact uvinter ⟨xu, tsubv xt⟩ },
+  intro h, refine ⟨_, h, t, set.subset.refl t, _⟩,
+  rintros x ⟨hx, xt⟩,
+  exact hx xt
+end
+
 end filter
 
 /-
@@ -541,6 +557,21 @@ theorem tendsto_iff_rtendsto' (l₁ : filter α) (l₂ : filter β) (f : α → 
   tendsto f l₁ l₂ ↔ rtendsto' (function.graph f) l₁ l₂ :=
 by { simp [tendsto_def, function.graph, rtendsto'_def, rel.preimage_def, set.preimage] }
 
+theorem tendsto_if {l₁ : filter α} {l₂ : filter β} 
+    {f g : α → β} {p : α → Prop} [decidable_pred p]
+    (h₀ : tendsto f (l₁ ⊓ principal p) l₂) 
+    (h₁ : tendsto g (l₁ ⊓ principal { x | ¬ p x }) l₂) :
+  tendsto (λ x, if p x then f x else g x) l₁ l₂ :=
+begin
+  revert h₀ h₁, simp only [tendsto_def, mem_inf_principal],
+  intros h₀ h₁ s hs,
+  apply mem_sets_of_superset (inter_mem_sets (h₀ s hs) (h₁ s hs)),
+  rintros x ⟨hp₀, hp₁⟩, dsimp,
+  by_cases h : p x, 
+  { rw if_pos h, exact hp₀ h }, 
+  rw if_neg h, exact hp₁ h
+end
+
 end filter
 
 open filter
@@ -549,65 +580,107 @@ section
 
 variable [topological_space α]
 
-def at_within (a : α) (s : set α) : filter α := nhds a ⊓ principal (s \ singleton a)
+def nhds_within (a : α) (s : set α) : filter α := nhds a ⊓ principal s
 
-def at_pt (a : α) : filter α := at_within a set.univ
-
-theorem mem_at_within (t : set α) (a : α) (s : set α) :
-  t ∈ (at_within a s).sets ↔ ∃ u, is_open u ∧ a ∈ u ∧ u ∩ (s \ {a}) ⊆ t  :=
+theorem nhds_within_eq (a : α) (s : set α) : 
+  nhds_within a s = ⨅ t ∈ {t : set α | a ∈ t ∧ is_open t}, principal (t ∩ s) :=
+have set.univ ∈ {s : set α | a ∈ s ∧ is_open s}, from ⟨set.mem_univ _, is_open_univ⟩,
 begin
-  simp [at_within, mem_inf_sets, nhds_sets, principal], split,
-  { rintros ⟨t₁, ⟨⟨u, usubt₁, openu, au⟩, ⟨t₂, sasubt₂, t₁t₂subt⟩⟩ ⟩,
-    exact ⟨u, openu, au, 
-      set.subset.trans (set.inter_subset_inter usubt₁ sasubt₂) t₁t₂subt⟩ },
-  rintros ⟨u, openu, au, hu⟩, 
-  exact ⟨u, ⟨⟨u, set.subset.refl u, openu, au⟩, ⟨_, set.subset.refl _, hu⟩⟩⟩
+  rw [nhds_within, nhds, lattice.binfi_inf]; try { exact this },
+  simp only [inf_principal]
 end
 
-theorem mem_at_pt (t : set α) (a : α) :
-  t ∈ (at_pt a).sets ↔ ∃ u, is_open u ∧ a ∈ u ∧ u \ {a} ⊆ t :=
-by simp [at_pt, mem_at_within, (set.inter_diff_assoc _ _ _).symm]
+theorem nhds_within_univ (a : α) : nhds_within a set.univ = nhds a :=
+by rw [nhds_within, principal_univ, lattice.inf_top_eq]
 
-theorem rtendsto_at_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
-  rtendsto r (at_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, x ≠ a → ∀ y, r x y → y ∈ t :=
-by simp [rtendsto_def, mem_at_within, set.subset_def, rel.mem_core]
+theorem mem_nhds_within (t : set α) (a : α) (s : set α) :
+  t ∈ (nhds_within a s).sets ↔ ∃ u, is_open u ∧ a ∈ u ∧ u ∩ s ⊆ t  :=
+begin
+  rw [nhds_within, mem_inf_principal, mem_nhds_sets_iff], split,
+  { rintros ⟨u, hu, openu, au⟩,
+    exact ⟨u, openu, au, λ x ⟨xu, xs⟩, hu xu xs⟩ },
+  rintros ⟨u, openu, au, hu⟩,
+  exact ⟨u, λ x xu xs, hu ⟨xu, xs⟩, openu, au⟩
+end
 
-theorem rtendsto'_at_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
-  rtendsto' r (at_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, x ≠ a → ∃ y ∈ t, r x y :=
-by simp [rtendsto'_def, mem_at_within, set.subset_def, rel.mem_preimage]
+theorem nhds_within_mono (a : α) {s t : set α} (h : s ⊆ t) : nhds_within a s ≤ nhds_within a t :=
+lattice.inf_le_inf (le_refl _) (principal_mono.mpr h)
 
-theorem ptendsto_at_within (f : α →. β) (a : α) (s : set α) (l : filter β) :
-  ptendsto f (at_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, x ≠ a → ∀ y ∈ f x, y ∈ t :=
-by rw [ptendsto_iff_rtendsto, rtendsto_at_within, pfun.graph']
+theorem nhds_within_restrict {a : α} (s : set α) {t : set α} (h₀ : a ∈ t) (h₁ : is_open t) :
+  nhds_within a s = nhds_within a (s ∩ t) :=
+have s ∩ t ∈ (nhds_within a s).sets, 
+  from inter_mem_sets (mem_inf_sets_of_right (mem_principal_self s)) 
+         (mem_inf_sets_of_left (mem_nhds_sets h₁ h₀)),
+le_antisymm
+  (lattice.le_inf lattice.inf_le_left (le_principal_iff.mpr this)) 
+  (lattice.inf_le_inf (le_refl _) (principal_mono.mpr (set.inter_subset_left _ _)))
 
-theorem tendsto_at_within (f : α → β) (a : α) (s : set α) (l : filter β) :
-  tendsto f (at_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, x ≠ a → f x ∈ t :=
-by rw [tendsto_iff_ptendsto', ptendsto_at_within, pfun.res_univ]; 
+theorem nhds_within_eq_nhds_within {a : α} {s t u : set α} 
+    (h₀ : a ∈ s) (h₁ : is_open s) (h₂ : t ∩ s = u ∩ s) :
+  nhds_within a t = nhds_within a u :=
+by rw [nhds_within_restrict t h₀ h₁, nhds_within_restrict u h₀ h₁, h₂]
+
+theorem nhs_within_eq_of_open {a : α} {s : set α} (h₀ : a ∈ s) (h₁ : is_open s) : 
+  nhds_within a s = nhds a :=
+by rw [←nhds_within_univ]; apply nhds_within_eq_nhds_within h₀ h₁; 
+     rw [set.univ_inter, set.inter_self]
+
+@[simp] theorem nhds_within_empty (a : α) : nhds_within a {} = ⊥ :=
+by rw [nhds_within, principal_empty, lattice.inf_bot_eq]
+
+theorem nhds_within_union (a : α) (s t : set α) : 
+  nhds_within a (s ∪ t) = nhds_within a s ⊔ nhds_within a t :=
+by unfold nhds_within; rw [←lattice.inf_sup_left, sup_principal]
+
+theorem nhds_within_inter (a : α) (s t : set α) : 
+  nhds_within a (s ∩ t) = nhds_within a s ⊓ nhds_within a t :=
+by unfold nhds_within; rw [lattice.inf_left_comm, lattice.inf_assoc, inf_principal,
+                             ←lattice.inf_assoc, lattice.inf_idem]
+
+theorem nhds_within_inter' (a : α) (s t : set α) :
+  nhds_within a (s ∩ t) = (nhds_within a s) ⊓ principal t :=
+by { unfold nhds_within, rw [←inf_principal, lattice.inf_assoc] }
+
+theorem rtendsto_nhds_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
+  rtendsto r (nhds_within a s) l ↔ 
+    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, ∀ y, r x y → y ∈ t :=
+by simp [rtendsto_def, mem_nhds_within, set.subset_def, rel.mem_core]
+
+theorem rtendsto'_nhds_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
+  rtendsto' r (nhds_within a s) l ↔ 
+    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, ∃ y ∈ t, r x y :=
+by simp [rtendsto'_def, mem_nhds_within, set.subset_def, rel.mem_preimage]
+
+theorem ptendsto_nhds_within (f : α →. β) (a : α) (s : set α) (l : filter β) :
+  ptendsto f (nhds_within a s) l ↔ 
+    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, ∀ y ∈ f x, y ∈ t :=
+by rw [ptendsto_iff_rtendsto, rtendsto_nhds_within, pfun.graph']
+
+theorem tendsto_nhds_within (f : α → β) (a : α) (s : set α) (l : filter β) :
+  tendsto f (nhds_within a s) l ↔ 
+    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, f x ∈ t :=
+by rw [tendsto_iff_ptendsto', ptendsto_nhds_within, pfun.res_univ]; 
     simp only [pfun.coe_val, roption.mem_some_iff, forall_eq]
 
-theorem rtendsto_at_pt (r : rel α β) (a : α) (l : filter β) :
-  rtendsto r (at_pt a) l ↔ 
-    ∀ t ∈ l.sets, ∃ u : set α, is_open u ∧ a ∈ u ∧ ∀ x ∈ u, x ≠ a → ∀ y, r x y → y ∈ t :=
-by rw [at_pt, rtendsto_at_within]; simp only [set.inter_univ]
+theorem tendsto_if_nhds_within {f g : α → β} {p : α → Prop} [decidable_pred p]
+    {a : α} {s : set α} {l : filter β}
+    (h₀ : tendsto f (nhds_within a (s ∩ p)) l)
+    (h₁ : tendsto g (nhds_within a (s ∩ {x | ¬ p x})) l) :
+  tendsto (λ x, if p x then f x else g x) (nhds_within a s) l :=
+by apply tendsto_if; rw [←nhds_within_inter']; assumption
 
-theorem rtendsto'_at_pt (r : rel α β) (a : α) (l : filter β) :
-  rtendsto' r (at_pt a) l ↔  
-    ∀ t ∈ l.sets, ∃ u : set α, is_open u ∧ a ∈ u ∧ ∀ x ∈ u, x ≠ a → ∃ y ∈ t, r x y :=
-by rw [at_pt, rtendsto'_at_within]; simp only [set.inter_univ]
-
-theorem ptendsto_at_pt (f : α →. β) (a : α) (l : filter β) :
-  ptendsto f (at_pt a) l ↔ 
-    ∀ t ∈ l.sets, ∃ u : set α, is_open u ∧ a ∈ u ∧ ∀ x ∈ u, x ≠ a → ∀ y ∈ f x, y ∈ t :=
-by rw [at_pt, ptendsto_at_within]; simp only [set.inter_univ]
-
-theorem tendsto_at_pt (f : α → β) (a : α) (l : filter β) :
-  tendsto f (at_pt a) l ↔ 
-    ∀ t ∈ l.sets, ∃ u : set α, is_open u ∧ a ∈ u ∧ ∀ x ∈ u, x ≠ a → f x ∈ t :=
-by rw [at_pt, tendsto_at_within]; simp only [set.inter_univ]
+lemma map_nhds_within (f : α → β) (a : α) (s : set α) :
+  map f (nhds_within a s) = 
+    ⨅ t ∈ {t : set α | a ∈ t ∧ is_open t}, principal (set.image f (t ∩ s)) :=
+have h₀ : directed_on ((λ (i : set α), principal (i ∩ s)) ⁻¹'o ge)
+        {x : set α | x ∈ {t : set α | a ∈ t ∧ is_open t}}, from
+  assume x ⟨ax, openx⟩ y ⟨ay, openy⟩,
+  ⟨x ∩ y, ⟨⟨ax, ay⟩, is_open_inter openx openy⟩,      
+    le_principal_iff.mpr (set.inter_subset_inter_left _ (set.inter_subset_left _ _)),
+    le_principal_iff.mpr (set.inter_subset_inter_left _ (set.inter_subset_right _ _))⟩,
+have h₁ : ∃ (i : set α), i ∈ {t : set α | a ∈ t ∧ is_open t}, 
+  from ⟨set.univ, set.mem_univ _, is_open_univ⟩,
+by { rw [nhds_within_eq, map_binfi_eq h₀ h₁], simp only [map_principal] }
 
 /- nhds in the induced topology -/
 
@@ -635,54 +708,39 @@ by rw [nhds_induced, map_comap_of_surjective hf]
 
 theorem mem_nhds_subtype (s : set α) (a : {x // x ∈ s}) (t : set {x // x ∈ s}) : 
   t ∈ (nhds a).sets ↔ ∃ u ∈ (nhds a.val).sets, (@subtype.val α s) ⁻¹' u ⊆ t :=
-begin
- rw mem_nhds_induced
-end
+by rw mem_nhds_induced
 
 theorem nhds_subtype (s : set α) (a : {x // x ∈ s}) :
   nhds a = comap subtype.val (nhds a.val) :=
 by rw nhds_induced
 
-theorem principal_subtype_eq (s : set α) (t : set {x // x ∈ s}) :
+theorem principal_subtype (s : set α) (t : set {x // x ∈ s}) :
   principal t = comap subtype.val (principal (subtype.val '' t)) :=
 by rw comap_principal; rw set.preimage_image_eq; apply subtype.val_injective
 
-theorem mem_at_within_subtype (s : set α) (a : {x // x ∈ s}) (t u : set {x // x ∈ s}) :
-  t ∈ (at_within a u).sets ↔ 
-    t ∈ (comap (@subtype.val _ s) (at_within (a.val) (subtype.val '' u))).sets :=
-have h₀ : (@subtype.val _ s) '' -{a} = s ∩ -{a.val},
-  begin 
-    ext x, cases a with a as, simp, split,
-    { rintros ⟨y, ys, yne, yeq⟩, rw ←yeq, exact ⟨ys, yne⟩ },
-    rintros ⟨xs, xne⟩, exact ⟨x, xs, xne, rfl⟩ 
-  end, 
-have h₁ : subtype.val '' u ⊆ s, from subtype.val_image_subset _ _, 
-have subtype.val '' (u \ {a}) = subtype.val '' u \ {a.val}, 
-  begin
-    rw [set.diff_eq, ←set.image_inter subtype.val_injective, h₀, ←set.inter_assoc],
-    rw [set.inter_eq_self_of_subset_left h₁, set.diff_eq]
-  end,
-by rw [at_within, nhds_subtype, principal_subtype_eq, ←comap_inf, this, ←at_within]
+theorem mem_nhds_within_subtype (s : set α) (a : {x // x ∈ s}) (t u : set {x // x ∈ s}) :
+  t ∈ (nhds_within a u).sets ↔ 
+    t ∈ (comap (@subtype.val _ s) (nhds_within a.val (subtype.val '' u))).sets :=
+by rw [nhds_within, nhds_subtype, principal_subtype, ←comap_inf, ←nhds_within]
 
-theorem at_within_subtype (s : set α) (a : {x // x ∈ s}) (t : set {x // x ∈ s}) : 
-  at_within a t = comap (@subtype.val _ s) (at_within (a.val) (subtype.val '' t)) :=
-filter_eq $ by ext u; rw mem_at_within_subtype
+theorem nhds_within_subtype (s : set α) (a : {x // x ∈ s}) (t : set {x // x ∈ s}) : 
+  nhds_within a t = comap (@subtype.val _ s) (nhds_within a.val (subtype.val '' t)) :=
+filter_eq $ by ext u; rw mem_nhds_within_subtype
 
-theorem at_within_eq_map_subtype_val {s : set α} {a : α} (h : a ∈ s) :
-  at_within a s = map subtype.val (at_pt ⟨a, h⟩) :=
-have h₀ : s ∈ (at_within a s).sets,
-  by { rw [mem_at_within], existsi set.univ, simp [set.diff_eq] },  
+theorem nhds_within_eq_map_subtype_val {s : set α} {a : α} (h : a ∈ s) :
+  nhds_within a s = map subtype.val (nhds ⟨a, h⟩) :=
+have h₀ : s ∈ (nhds_within a s).sets,
+  by { rw [mem_nhds_within], existsi set.univ, simp [set.diff_eq] },  
 have h₁ : ∀ y ∈ s, ∃ x, @subtype.val _ s x = y,
   from λ y h, ⟨⟨y, h⟩, rfl⟩,   
 begin
-  rw [at_pt, at_within_subtype, subtype.val_image_univ],
-  symmetry,
-  exact map_comap_of_surjective' h₀ h₁
+  rw [←nhds_within_univ, nhds_within_subtype, subtype.val_image_univ], 
+  exact (map_comap_of_surjective' h₀ h₁).symm,
 end
 
 theorem tendsto_at_within_iff_subtype {s : set α} {a : α} (h : a ∈ s) (f : α → β) (l : filter β) :
-  tendsto f (at_within a s) l ↔ tendsto (f ∘ (@subtype.val _ s)) (at_pt ⟨a, h⟩) l :=
-by rw [tendsto, tendsto, at_within_eq_map_subtype_val h, ←(@filter.map_map _ _ _ _ subtype.val)]
+  tendsto f (nhds_within a s) l ↔ tendsto (f ∘ (@subtype.val _ s)) (nhds ⟨a, h⟩) l :=
+by rw [tendsto, tendsto, nhds_within_eq_map_subtype_val h, ←(@filter.map_map _ _ _ _ subtype.val)]
 
 end
 
@@ -690,68 +748,36 @@ namespace metric
 
 variable [metric_space α]
 
-theorem mem_at_within (t : set α) (a : α) (s : set α) :
-  t ∈ (at_within a s).sets ↔ ∃ δ > 0, ∀ x ∈ s, dist x a < δ → x ≠ a → x ∈ t :=
+theorem mem_nhds_within (t : set α) (a : α) (s : set α) :
+  t ∈ (nhds_within a s).sets ↔ ∃ δ > 0, ∀ x ∈ s, dist x a < δ → x ∈ t :=
 begin
-  rw mem_at_within, split,
+  rw mem_nhds_within, split,
   { rintros ⟨u, openu, au, hu⟩,
-    have h := is_open_metric.mp openu a au,
-    rcases h with ⟨δ, δgt0, ballsub⟩,
-    existsi δ, existsi δgt0,
-    rintros x xs distxa xnea,
-    apply hu,
-    split,
-    { show x ∈ u, apply ballsub, apply distxa },
-    split, { exact xs },
-    dsimp, rw set.mem_singleton_iff,
-    exact xnea },
+    rcases is_open_metric.mp openu a au with ⟨δ, δgt0, ballsub⟩,
+    exact ⟨δ, δgt0, (λ x xs distxa, hu ⟨ballsub distxa, xs⟩)⟩ },
   rintros ⟨δ, δgt0, h⟩,
-  existsi ball a δ, split, { apply is_open_ball },
-  split, { apply mem_ball_self δgt0 },
-  rintros x ⟨distx, xs, xna⟩,
-  apply h x xs distx,
-  rwa set.mem_singleton_iff at xna
+  exact ⟨ball a δ, is_open_ball, mem_ball_self δgt0, λ x ⟨distx, xs⟩, h x xs distx ⟩
 end
 
-theorem mem_at_pt (t : set α) (a : α) :
-  t ∈ (at_pt a).sets ↔ ∃ δ > 0, ∀ x, dist x a < δ → x ≠ a → x ∈ t :=
-by rw [at_pt, mem_at_within]; simp
+theorem rtendsto_nhds_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
+  rtendsto r (nhds_within a s) l ↔ 
+    ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ → ∀ y, r x y → y ∈ t :=
+by simp [rtendsto_def, mem_nhds_within, set.subset_def, rel.mem_core]
 
-theorem rtendsto_at_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
-  rtendsto r (at_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ → x ≠ a → ∀ y, r x y → y ∈ t :=
-by simp [rtendsto_def, mem_at_within, set.subset_def, rel.mem_core]
+theorem rtendsto'_nhds_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
+  rtendsto' r (nhds_within a s) l ↔ 
+    ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ → ∃ y ∈ t, r x y :=
+by simp [rtendsto'_def, mem_nhds_within, set.subset_def, rel.mem_preimage]
 
-theorem rtendsto'_at_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
-  rtendsto' r (at_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ ∧ x ≠ a → ∃ y ∈ t, r x y :=
-by simp [rtendsto'_def, mem_at_within, set.subset_def, rel.mem_preimage]
+theorem ptendsto_nhds_within (f : α →. β) (a : α) (s : set α) (l : filter β) :
+  ptendsto f (nhds_within a s) l ↔ 
+    ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ → ∀ y ∈ f x, y ∈ t :=
+by rw [ptendsto_iff_rtendsto, rtendsto_nhds_within, pfun.graph']
 
-theorem ptendsto_at_within (f : α →. β) (a : α) (s : set α) (l : filter β) :
-  ptendsto f (at_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ → x ≠ a → ∀ y ∈ f x, y ∈ t :=
-by rw [ptendsto_iff_rtendsto, rtendsto_at_within, pfun.graph']
-
-theorem tendsto_at_within (f : α → β) (a : α) (s : set α) (l : filter β) :
-  tendsto f (at_within a s) l ↔ ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ → x ≠ a → f x ∈ t :=
-by rw [tendsto_iff_ptendsto', ptendsto_at_within, pfun.res_univ]; 
+theorem tendsto_nhds_within (f : α → β) (a : α) (s : set α) (l : filter β) :
+  tendsto f (nhds_within a s) l ↔ ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ → f x ∈ t :=
+by rw [tendsto_iff_ptendsto', ptendsto_nhds_within, pfun.res_univ]; 
     simp only [pfun.coe_val, roption.mem_some_iff, forall_eq]
-
-theorem rtendsto_at_pt (r : rel α β) (a : α) (l : filter β) :
-  rtendsto r (at_pt a) l ↔ ∀ t ∈ l.sets, ∃ δ > 0, ∀ x, dist x a < δ → x ≠ a → ∀ y, r x y → y ∈ t :=
-by rw [at_pt, rtendsto_at_within]; simp
-
-theorem rtendsto'_at_pt (r : rel α β) (a : α) (l : filter β) :
-  rtendsto' r (at_pt a) l ↔ ∀ t ∈ l.sets, ∃ δ > 0, ∀ x, dist x a < δ → x ≠ a → ∃ y ∈ t, r x y :=
-by rw [at_pt, rtendsto'_at_within]; simp
-
-theorem ptendsto_at_pt (f : α →. β) (a : α) (l : filter β) :
-  ptendsto f (at_pt a) l ↔ ∀ t ∈ l.sets, ∃ δ > 0, ∀ x, dist x a < δ → x ≠ a → ∀ y ∈ f x, y ∈ t :=
-by rw [at_pt, ptendsto_at_within]; simp
-
-theorem tendsto_at_pt (f : α → β) (a : α) (l : filter β) :
-  tendsto f (at_pt a) l ↔ ∀ t ∈ l.sets, ∃ δ > 0, ∀ x, dist x a < δ → x ≠ a → f x ∈ t :=
-by rw [at_pt, tendsto_at_within]; simp
 
 end metric
 
