@@ -9,7 +9,7 @@ all: $(OBJS)
 depends: $(DEPS)
 
 %.depend: %.lean
-	@echo $(<:.lean=.olean): `~/lean/lean-master/bin/lean --deps $< | python relative.py`  > $@
+	@echo $(<:.lean=.olean): `lean --deps $< | python relative.py`  > $@
 
 # %.depend: ;
 
