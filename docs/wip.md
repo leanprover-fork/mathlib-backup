@@ -7,9 +7,11 @@ always welcome.
   [commutative algebra](https://github.com/leanprover/mathlib/pull/37), with a view toward algrebraic geometry.
 
 * [Scott Morrison](https://github.com/semorrison) is working
-  on merging his [category
-  theory](https://github.com/semorrison/lean-category-theory) into
+  on merging his category
+  theory ([part 1](https://github.com/semorrison/lean-category-theory-pr), [part 2](https://github.com/semorrison/lean-category-theory), [part 3](https://github.com/semorrison/lean-monoidal-categories))) into
   mathlib.
+
+* [Reid Barton](https://github.com/rwbarton) is working on [homotopy theory](https://github.com/rwbarton/lean-homotopy-theory).  
 
 * [Chris Hughes](https://github.com/dorhinj) is working on the
   [exponential function](https://github.com/dorhinj/mathlib)
@@ -21,3 +23,6 @@ always welcome.
 * [Kevin Buzzard](https://github.com/kbuzzard) is working on [sheaf
   theory](https://github.com/kbuzzard/xena/blob/master/xenalib/scheme.lean)
   with a view toward algebraic geometry.
+
+* [Sean Leather](https://github.com/spl) is working on a
+  [finite map](https://github.com/spl/lean-finmap) for mathlib.

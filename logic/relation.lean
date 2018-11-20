@@ -5,7 +5,7 @@ Authors: Johannes Hölzl
 
 Transitive reflexive as well as reflexive closure of relations.
 -/
-import tactic logic.relator
+import tactic.interactive tactic.mk_iff_of_inductive_prop logic.relator
 variables {α : Type*} {β : Type*} {γ : Type*} {δ : Type*}
 
 namespace relation
@@ -153,6 +153,19 @@ begin
     rcases h with rfl | ⟨c, hac, hcb⟩,
     { refl },
     { exact head hac hcb } }
+end
+
+lemma total_of_right_unique (U : relator.right_unique r)
+  (ab : refl_trans_gen r a b) (ac : refl_trans_gen r a c) :
+  refl_trans_gen r b c ∨ refl_trans_gen r c b :=
+begin
+  induction ab with b d ab bd IH,
+  { exact or.inl ac },
+  { rcases IH with IH | IH,
+    { rcases cases_head IH with rfl | ⟨e, be, ec⟩,
+      { exact or.inr (single bd) },
+      { cases U bd be, exact or.inl ec } },
+    { exact or.inr (IH.tail bd) } }
 end
 
 end refl_trans_gen

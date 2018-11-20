@@ -5,7 +5,7 @@ Authors: Jeremy Avigad, Leonardo de Moura
 
 Definitions and properties of gcd, lcm, and coprime.
 -/
-import data.nat.basic data.int.basic
+import data.nat.basic
 
 namespace nat
 
@@ -94,56 +94,29 @@ dvd_antisymm (gcd_dvd_left _ _) (dvd_gcd (dvd_refl _) H)
 theorem gcd_eq_right {m n : ℕ} (H : n ∣ m) : gcd m n = n :=
 by rw [gcd_comm, gcd_eq_left H]
 
-/- extended euclidean algorithm -/
+@[simp] lemma gcd_mul_left_left (m n : ℕ) : gcd (m * n) n = n :=
+dvd_antisymm (gcd_dvd_right _ _) (dvd_gcd (dvd_mul_left _ _) (dvd_refl _))
 
-def xgcd_aux : ℕ → ℤ → ℤ → ℕ → ℤ → ℤ → ℕ × ℤ × ℤ
-| 0          s t r' s' t' := (r', s', t')
-| r@(succ _) s t r' s' t' :=
-  have r' % r < r, from mod_lt _ $ succ_pos _,
-  let q := r' / r in xgcd_aux (r' % r) (s' - q * s) (t' - q * t) r s t
+@[simp] lemma gcd_mul_left_right (m n : ℕ) : gcd n (m * n) = n :=
+by rw [gcd_comm, gcd_mul_left_left]
 
-@[simp] theorem xgcd_zero_left {s t r' s' t'} : xgcd_aux 0 s t r' s' t' = (r', s', t') :=
-by simp [xgcd_aux]
+@[simp] lemma gcd_mul_right_left (m n : ℕ) : gcd (n * m) n = n :=
+by rw [mul_comm, gcd_mul_left_left]
 
-@[simp] theorem xgcd_aux_rec {r s t r' s' t'} (h : 0 < r) : xgcd_aux r s t r' s' t' = xgcd_aux (r' % r) (s' - (r' / r) * s) (t' - (r' / r) * t) r s t :=
-by cases r; [exact absurd h (lt_irrefl _), {simp only [xgcd_aux], refl}]
+@[simp] lemma gcd_mul_right_right (m n : ℕ) : gcd n (n * m) = n :=
+by rw [gcd_comm, gcd_mul_right_left]
 
-/-- Use the extended GCD algorithm to generate the `a` and `b` values
-  satisfying `gcd x y = x * a + y * b`. -/
-def xgcd (x y : ℕ) : ℤ × ℤ := (xgcd_aux x 1 0 y 0 1).2
+@[simp] lemma gcd_gcd_self_right_left (m n : ℕ) : gcd m (gcd m n) = gcd m n :=
+dvd_antisymm (gcd_dvd_right _ _) (dvd_gcd (gcd_dvd_left _ _) (dvd_refl _))
 
-/-- The extended GCD `a` value in the equation `gcd x y = x * a + y * b`. -/
-def gcd_a (x y : ℕ) : ℤ := (xgcd x y).1
+@[simp] lemma gcd_gcd_self_right_right (m n : ℕ) : gcd m (gcd n m) = gcd n m :=
+by rw [gcd_comm n m, gcd_gcd_self_right_left]
 
-/-- The extended GCD `b` value in the equation `gcd x y = x * a + y * b`. -/
-def gcd_b (x y : ℕ) : ℤ := (xgcd x y).2
+@[simp] lemma gcd_gcd_self_left_right (m n : ℕ) : gcd (gcd n m) m = gcd n m :=
+by rw [gcd_comm, gcd_gcd_self_right_right]
 
-@[simp] theorem xgcd_aux_fst (x y) : ∀ s t s' t',
-  (xgcd_aux x s t y s' t').1 = gcd x y :=
-gcd.induction x y (by simp) (λ x y h IH s t s' t', by simp [h, IH]; rw ← gcd_rec)
-
-theorem xgcd_aux_val (x y) : xgcd_aux x 1 0 y 0 1 = (gcd x y, xgcd x y) :=
-by rw [xgcd, ← xgcd_aux_fst x y 1 0 0 1]; cases xgcd_aux x 1 0 y 0 1; refl
-
-theorem xgcd_val (x y) : xgcd x y = (gcd_a x y, gcd_b x y) :=
-by unfold gcd_a gcd_b; cases xgcd x y; refl
-
-section
-parameters (a b : ℕ)
-
-private def P : ℕ × ℤ × ℤ → Prop | (r, s, t) := (r : ℤ) = a * s + b * t
-
-theorem xgcd_aux_P {r r'} : ∀ {s t s' t'}, P (r, s, t) → P (r', s', t') → P (xgcd_aux r s t r' s' t') :=
-gcd.induction r r' (by simp) $ λ x y h IH s t s' t' p p', begin
-  rw [xgcd_aux_rec h], refine IH _ p, dsimp [P] at *,
-  rw [int.mod_def], generalize : (y / x : ℤ) = k,
-  rw [p, p'], simp [mul_add, mul_comm, mul_left_comm]
-end
-
-theorem gcd_eq_gcd_ab : (gcd a b : ℤ) = a * gcd_a a b + b * gcd_b a b :=
-by have := @xgcd_aux_P a b a b 1 0 0 1 (by simp [P]) (by simp [P]);
-   rwa [xgcd_aux_val, xgcd_val] at this
-end
+@[simp] lemma gcd_gcd_self_left_left (m n : ℕ) : gcd (gcd m n) m = gcd m n :=
+by rw [gcd_comm m n, gcd_gcd_self_left_right]
 
 /- lcm -/
 
@@ -245,10 +218,14 @@ theorem not_coprime_of_dvd_of_dvd {m n d : ℕ} (dgt1 : d > 1) (Hm : d ∣ m) (H
 not_lt_of_ge (le_of_dvd zero_lt_one $ by rw ←co; exact dvd_gcd Hm Hn) dgt1
 
 theorem exists_coprime {m n : ℕ} (H : gcd m n > 0) :
-  exists m' n', coprime m' n' ∧ m = m' * gcd m n ∧ n = n' * gcd m n :=
+  ∃ m' n', coprime m' n' ∧ m = m' * gcd m n ∧ n = n' * gcd m n :=
 ⟨_, _, coprime_div_gcd_div_gcd H,
   (nat.div_mul_cancel (gcd_dvd_left m n)).symm,
   (nat.div_mul_cancel (gcd_dvd_right m n)).symm⟩
+
+theorem exists_coprime' {m n : ℕ} (H : gcd m n > 0) :
+  ∃ g m' n', 0 < g ∧ coprime m' n' ∧ m = m' * g ∧ n = n' * g :=
+let ⟨m', n', h⟩ := exists_coprime H in ⟨_, m', n', H, h⟩
 
 theorem coprime.mul {m n k : ℕ} (H1 : coprime m k) (H2 : coprime n k) : coprime (m * n) k :=
 (H1.gcd_mul_left_cancel n).trans H2
@@ -274,6 +251,17 @@ H.coprime_dvd_right (dvd_mul_left _ _)
 theorem coprime.coprime_mul_right_right {k m n : ℕ} (H : coprime m (n * k)) : coprime m n :=
 H.coprime_dvd_right (dvd_mul_right _ _)
 
+lemma coprime_mul_iff_left {k m n : ℕ} : coprime (m * n) k ↔ coprime m k ∧ coprime n k :=
+⟨λ h, ⟨coprime.coprime_mul_right h, coprime.coprime_mul_left h⟩,
+  λ ⟨h, _⟩, by rwa [coprime, coprime.gcd_mul_left_cancel n h]⟩
+
+lemma coprime_mul_iff_right {k m n : ℕ} : coprime k (m * n) ↔ coprime m k ∧ coprime n k :=
+by rw [coprime, nat.gcd_comm]; exact coprime_mul_iff_left
+
+lemma coprime.mul_dvd_of_dvd_of_dvd {a n m : ℕ} (hmn : coprime m n)
+  (hm : m ∣ a) (hn : n ∣ a) : m * n ∣ a :=
+let ⟨k, hk⟩ := hm in hk.symm ▸ mul_dvd_mul_left _ (hmn.symm.dvd_of_dvd_mul_left (hk ▸ hn))
+
 theorem coprime_one_left : ∀ n, coprime 1 n := gcd_one_left
 
 theorem coprime_one_right : ∀ n, coprime n 1 := gcd_one_right
@@ -290,7 +278,7 @@ theorem coprime.pow {k l : ℕ} (m n : ℕ) (H1 : coprime k l) : coprime (k ^ m)
 theorem coprime.eq_one_of_dvd {k m : ℕ} (H : coprime k m) (d : k ∣ m) : k = 1 :=
 by rw [← H.gcd_eq_one, gcd_eq_left d]
 
-theorem exists_eq_prod_and_dvd_and_dvd {m n k : nat} (H : k ∣ m * n) :
+theorem exists_eq_prod_and_dvd_and_dvd {m n k : ℕ} (H : k ∣ m * n) :
   ∃ m' n', k = m' * n' ∧ m' ∣ m ∧ n' ∣ n :=
 or.elim (eq_zero_or_pos (gcd k m))
   (λg0, ⟨0, n,
@@ -300,5 +288,18 @@ or.elim (eq_zero_or_pos (gcd k m))
      ⟨_, _, hd, gcd_dvd_right _ _,
     dvd_of_mul_dvd_mul_left gpos $ by rw [←hd, ←gcd_mul_right]; exact
       dvd_gcd (dvd_mul_right _ _) H⟩)
+
+theorem pow_dvd_pow_iff {a b n : ℕ} (n0 : 0 < n) : a ^ n ∣ b ^ n ↔ a ∣ b :=
+begin
+  refine ⟨λ h, _, λ h, pow_dvd_pow_of_dvd h _⟩,
+  cases eq_zero_or_pos (gcd a b) with g0 g0,
+  { simp [eq_zero_of_gcd_eq_zero_right g0] },
+  rcases exists_coprime' g0 with ⟨g, a', b', g0', co, rfl, rfl⟩,
+  rw [mul_pow, mul_pow] at h,
+  replace h := dvd_of_mul_dvd_mul_right (pos_pow_of_pos _ g0') h,
+  have := pow_dvd_pow a' n0,
+  rw [pow_one, (co.pow n n).eq_one_of_dvd h] at this,
+  simp [eq_one_of_dvd_one this]
+end
 
 end nat

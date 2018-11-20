@@ -276,8 +276,7 @@ begin
     (nat.succ_le_succ (nat.le_add_right _ _)),
   have m1 : m.unpair.1 < n + 4, from lt_of_le_of_lt m.unpair_le_left hm,
   have m2 : m.unpair.2 < n + 4, from lt_of_le_of_lt m.unpair_le_right hm,
-  simp [G₁], simp [list.nth_map, list.nth_range,
-    hm, m1, m2, option.map, option.bind],
+  simp [G₁], simp [list.nth_map, list.nth_range, hm, m1, m2],
   change of_nat code (n+4) with of_nat_code (n+4),
   simp [of_nat_code],
   cases n.bodd; cases n.div2.bodd; refl
@@ -370,8 +369,7 @@ begin
     (nat.succ_le_succ (nat.le_add_right _ _)),
   have m1 : m.unpair.1 < n + 4, from lt_of_le_of_lt m.unpair_le_left hm,
   have m2 : m.unpair.2 < n + 4, from lt_of_le_of_lt m.unpair_le_right hm,
-  simp [G₁], simp [list.nth_map, list.nth_range,
-    hm, m1, m2, option.map, option.bind],
+  simp [G₁], simp [list.nth_map, list.nth_range, hm, m1, m2],
   change of_nat code (n+4) with of_nat_code (n+4),
   simp [of_nat_code],
   cases n.bodd; cases n.div2.bodd; refl
@@ -467,8 +465,7 @@ begin
     (nat.succ_le_succ (nat.le_add_right _ _)),
   have m1 : m.unpair.1 < n + 4, from lt_of_le_of_lt m.unpair_le_left hm,
   have m2 : m.unpair.2 < n + 4, from lt_of_le_of_lt m.unpair_le_right hm,
-  simp [G₁], simp [list.nth_map, list.nth_range,
-    hm, m1, m2, option.map, option.bind],
+  simp [G₁], simp [list.nth_map, list.nth_range, hm, m1, m2],
   change of_nat code (n+4) with of_nat_code (n+4),
   simp [of_nat_code],
   cases n.bodd; cases n.div2.bodd; refl
@@ -692,7 +689,7 @@ theorem evaln_complete {c n x} : x ∈ eval c n ↔ ∃ k, x ∈ evaln k c n :=
       exact ⟨(max k₁ k₂).succ, nat.le_succ_of_le $
         le_max_left_of_le $ nat.le_of_lt_succ $ evaln_bound hk₁, a,
         evaln_mono (nat.succ_le_succ $ nat.le_succ_of_le $ le_max_left _ _) hk₁,
-        by simpa [nat.succ_eq_add_one, a0] using
+        by simpa [nat.succ_eq_add_one, a0, -max_eq_left, -max_eq_right] using
           evaln_mono (nat.succ_le_succ $ le_max_right _ _) hk₂⟩ } }
 end, λ ⟨k, h⟩, evaln_sound h⟩
 
@@ -780,7 +777,7 @@ begin
       (snd.comp (primrec.unpair.comp n))
       (hlup.comp $ L.pair $ (k.pair cf).pair z)
       (_ : primrec _),
-    have L := L.comp fst, have z := z.comp fst, have y := snd, 
+    have L := L.comp fst, have z := z.comp fst, have y := snd,
     refine option_bind
       (hlup.comp $ L.pair $
         (((k'.pair c).comp fst).comp fst).pair

@@ -119,8 +119,7 @@ add_lt_of_nonpos_of_lt' (le_of_lt ha) hbc
 lemma add_lt_of_lt_of_neg' (hbc : b < c) (ha : a < 0) : b + a < c :=
 add_lt_of_lt_of_nonpos' hbc (le_of_lt ha)
 
-lemma add_eq_zero_iff_eq_zero_and_eq_zero_of_nonneg_of_nonneg'
-  (ha : 0 ≤ a) (hb : 0 ≤ b) : a + b = 0 ↔ a = 0 ∧ b = 0 :=
+lemma add_eq_zero_iff' (ha : 0 ≤ a) (hb : 0 ≤ b) : a + b = 0 ↔ a = 0 ∧ b = 0 :=
 iff.intro
   (assume hab : a + b = 0,
    have a ≤ 0, from hab ▸ le_add_of_le_of_nonneg' (le_refl _) hb,
@@ -134,6 +133,43 @@ lemma bit0_pos {a : α} (h : 0 < a) : 0 < bit0 a :=
 add_pos' h h
 
 end ordered_comm_monoid
+
+namespace units
+
+instance [monoid α] [preorder α] : preorder (units α) :=
+{ le := λ a b, (a:α) ≤ b,
+  lt := λ a b, (a:α) < b,
+  le_refl := λ a, @le_refl α _ _,
+  le_trans := λ a b c, @le_trans α _ _ _ _,
+  lt_iff_le_not_le := λ a b, @lt_iff_le_not_le α _ _ _ }
+
+@[simp] theorem coe_le_coe [monoid α] [preorder α] {a b : units α} :
+  (a : α) ≤ b ↔ a ≤ b := iff.rfl
+
+@[simp] theorem coe_lt_coe [monoid α] [preorder α] {a b : units α} :
+  (a : α) < b ↔ a < b := iff.rfl
+
+instance [monoid α] [partial_order α] : partial_order (units α) :=
+{ le_antisymm := λ a b h₁ h₂, ext $ le_antisymm h₁ h₂, ..units.preorder }
+
+instance [monoid α] [linear_order α] : linear_order (units α) :=
+{ le_total := λ a b, @le_total α _ _ _, ..units.partial_order }
+
+instance [monoid α] [decidable_linear_order α] : decidable_linear_order (units α) :=
+{ decidable_le := by apply_instance,
+  decidable_lt := by apply_instance,
+  decidable_eq := by apply_instance,
+  ..units.linear_order }
+
+theorem max_coe [monoid α] [decidable_linear_order α] {a b : units α} :
+  (↑(max a b) : α) = max a b :=
+by by_cases a ≤ b; simp [max, h]
+
+theorem min_coe [monoid α] [decidable_linear_order α] {a b : units α} :
+  (↑(min a b) : α) = min a b :=
+by by_cases a ≤ b; simp [min, h]
+
+end units
 
 namespace with_zero
 open lattice
@@ -182,16 +218,26 @@ namespace with_top
 open lattice
 
 instance [add_semigroup α] : add_semigroup (with_top α) :=
-@additive.add_semigroup _ $ @with_zero.semigroup (multiplicative α) _
+{ add := λ o₁ o₂, o₁.bind (λ a, o₂.map (λ b, a + b)),
+  ..@additive.add_semigroup _ $ @with_zero.semigroup (multiplicative α) _ }
+
+lemma coe_add [add_semigroup α] {a b : α} : ((a + b : α) : with_top α) = a + b :=
+rfl
 
 instance [add_comm_semigroup α] : add_comm_semigroup (with_top α) :=
-@additive.add_comm_semigroup _ $ @with_zero.comm_semigroup (multiplicative α) _
+{ ..@additive.add_comm_semigroup _ $
+    @with_zero.comm_semigroup (multiplicative α) _ }
 
 instance [add_monoid α] : add_monoid (with_top α) :=
-@additive.add_monoid _ $ @with_zero.monoid (multiplicative α) _
+{ zero := some 0,
+  add := (+),
+  ..@additive.add_monoid _ $ @with_zero.monoid (multiplicative α) _ }
 
 instance [add_comm_monoid α] : add_comm_monoid (with_top α) :=
-@additive.add_comm_monoid _ $ @with_zero.comm_monoid (multiplicative α) _
+{ zero := 0,
+  add := (+),
+  ..@additive.add_comm_monoid _ $
+    @with_zero.comm_monoid (multiplicative α) _ }
 
 instance [ordered_comm_monoid α] : ordered_comm_monoid (with_top α) :=
 begin
@@ -214,6 +260,36 @@ begin
     simp at h,
     exact ⟨_, rfl, add_le_add_left' h⟩, }
 end
+
+@[simp] lemma zero_lt_top [ordered_comm_monoid α] : (0 : with_top α) < ⊤ :=
+coe_lt_top 0
+
+@[simp] lemma zero_lt_coe [ordered_comm_monoid α] (a : α) : (0 : with_top α) < a ↔ 0 < a :=
+coe_lt_coe
+
+@[simp] lemma add_top [ordered_comm_monoid α] : ∀{a : with_top α}, a + ⊤ = ⊤
+| none := rfl
+| (some a) := rfl
+
+@[simp] lemma top_add [ordered_comm_monoid α] {a : with_top α} : ⊤ + a = ⊤ := rfl
+
+lemma add_eq_top [ordered_comm_monoid α] (a b : with_top α) : a + b = ⊤ ↔ a = ⊤ ∨ b = ⊤ :=
+by cases a; cases b; simp [none_eq_top, some_eq_coe, coe_add.symm]
+
+instance [canonically_ordered_monoid α] : canonically_ordered_monoid (with_top α) :=
+{ le_iff_exists_add := assume a b,
+  match a, b with
+  | a, none     := show a ≤ ⊤ ↔ ∃c, ⊤ = a + c, by simp; refine ⟨⊤, _⟩; cases a; refl
+  | (some a), (some b) := show (a:with_top α) ≤ ↑b ↔ ∃c:with_top α, ↑b = ↑a + c,
+    begin
+      simp [canonically_ordered_monoid.le_iff_exists_add, -add_comm],
+      split,
+      { rintro ⟨c, rfl⟩, refine ⟨c, _⟩, simp [coe_add] },
+      { exact assume h, match b, h with _, ⟨some c, rfl⟩ := ⟨_, rfl⟩ end }
+    end
+  | none, some b := show (⊤ : with_top α) ≤ b ↔ ∃c:with_top α, ↑b = ⊤ + c, by simp
+  end,
+  .. with_top.ordered_comm_monoid }
 
 end with_top
 
@@ -247,6 +323,14 @@ begin
     exact ⟨_, rfl, add_le_add_left' h⟩, }
 end
 
+@[simp] lemma coe_add [add_semigroup α] (a b : α) : ((a + b : α) : with_bot α) = a + b := rfl
+
+@[simp] lemma bot_add [ordered_comm_monoid α] (a : with_bot α) : ⊥ + a = ⊥ := rfl
+
+@[simp] lemma add_bot [ordered_comm_monoid α] (a : with_bot α) : a + ⊥ = ⊥ := by cases a; refl
+
+instance has_one [has_one α] : has_one (with_bot α) := ⟨(1 : α)⟩
+
 end with_bot
 
 section canonically_ordered_monoid
@@ -258,12 +342,23 @@ canonically_ordered_monoid.le_iff_exists_add a b
 @[simp] lemma zero_le (a : α) : 0 ≤ a := le_iff_exists_add.mpr ⟨a, by simp⟩
 
 @[simp] lemma add_eq_zero_iff : a + b = 0 ↔ a = 0 ∧ b = 0 :=
-add_eq_zero_iff_eq_zero_and_eq_zero_of_nonneg_of_nonneg' (zero_le _) (zero_le _)
+add_eq_zero_iff' (zero_le _) (zero_le _)
 
 @[simp] lemma le_zero_iff_eq : a ≤ 0 ↔ a = 0 :=
 iff.intro
   (assume h, le_antisymm h (zero_le a))
   (assume h, h ▸ le_refl a)
+
+protected lemma zero_lt_iff_ne_zero : 0 < a ↔ a ≠ 0 :=
+iff.intro ne_of_gt $ assume hne, lt_of_le_of_ne (zero_le _) hne.symm
+
+lemma le_add_left (h : a ≤ c) : a ≤ b + c :=
+calc a = 0 + a : by simp
+  ... ≤ b + c : add_le_add' (zero_le _) h
+
+lemma le_add_right (h : a ≤ b) : a ≤ b + c :=
+calc a = a + 0 : by simp
+  ... ≤ b + c : add_le_add' h (zero_le _)
 
 instance with_zero.canonically_ordered_monoid :
   canonically_ordered_monoid (with_zero α) :=
@@ -324,6 +419,19 @@ lemma add_eq_zero_iff_eq_zero_of_nonneg
 by split; apply le_antisymm; try {assumption};
    rw ← hab; simp [ha, hb],
 λ ⟨ha', hb'⟩, by rw [ha', hb', add_zero]⟩
+
+lemma with_top.add_lt_add_iff_left :
+  ∀{a b c : with_top α}, a < ⊤ → (a + c < a + b ↔ c < b)
+| none := assume b c h, (lt_irrefl ⊤ h).elim
+| (some a) :=
+  begin
+    assume b c h,
+    cases b; cases c;
+      simp [with_top.none_eq_top, with_top.some_eq_coe, with_top.coe_lt_top, with_top.coe_lt_coe],
+    { rw [← with_top.coe_add], exact with_top.coe_lt_top _ },
+    { rw [← with_top.coe_add, ← with_top.coe_add, with_top.coe_lt_coe],
+      exact add_lt_add_iff_left _ }
+  end
 
 end ordered_cancel_comm_monoid
 

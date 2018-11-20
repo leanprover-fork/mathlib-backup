@@ -9,7 +9,7 @@ Classical versions are in the namespace "classical".
 Note: in the presence of automation, this whole file may be unnecessary. On the other hand,
 maybe it is useful for writing automation.
 -/
-import data.prod tactic.interactive
+import data.prod tactic.cache
 
 /-
     miscellany
@@ -36,6 +36,30 @@ instance : decidable_eq empty := λa, a.elim
    part of a chain. -/
 @[simp] theorem coe_coe {α β γ} [has_coe α β] [has_coe_t β γ]
   (a : α) : (a : γ) = (a : β) := rfl
+
+@[simp] theorem coe_fn_coe_trans
+  {α β γ} [has_coe α β] [has_coe_t_aux β γ] [has_coe_to_fun γ]
+  (x : α) : @coe_fn α _ x = @coe_fn β _ x := rfl
+
+@[simp] theorem coe_fn_coe_base
+  {α β} [has_coe α β] [has_coe_to_fun β]
+  (x : α) : @coe_fn α _ x = @coe_fn β _ x := rfl
+
+@[simp] theorem coe_sort_coe_trans
+  {α β γ} [has_coe α β] [has_coe_t_aux β γ] [has_coe_to_sort γ]
+  (x : α) : @coe_sort α _ x = @coe_sort β _ x := rfl
+
+@[simp] theorem coe_sort_coe_base
+  {α β} [has_coe α β] [has_coe_to_sort β]
+  (x : α) : @coe_sort α _ x = @coe_sort β _ x := rfl
+
+/-- `pempty` is the universe-polymorphic analogue of `empty`. -/
+@[derive decidable_eq]
+inductive {u} pempty : Sort u
+
+def pempty.elim {C : Sort*} : pempty → C.
+
+instance subsingleton_pempty : subsingleton pempty := ⟨λa, a.elim⟩
 
 end miscellany
 
@@ -150,6 +174,9 @@ iff.intro and.left (λ ha, ⟨ha, h ha⟩)
 theorem and_iff_right_of_imp {a b : Prop} (h : b → a) : (a ∧ b) ↔ b :=
 iff.intro and.right (λ hb, ⟨h hb, hb⟩)
 
+lemma and.congr_right_iff : (a ∧ b ↔ a ∧ c) ↔ (a → (b ↔ c)) :=
+⟨λ h ha, by simp [ha] at h; exact h, and_congr_right⟩
+
 /- or -/
 
 theorem or_of_or_of_imp_of_imp (h₁ : a ∨ b) (h₂ : a → c) (h₃ : b → d) : c ∨ d :=
@@ -242,8 +269,17 @@ by rw [@iff_def (¬ a), @iff_def' a]; exact and_congr not_imp_not not_imp_not
 theorem not_iff_comm [decidable a] [decidable b] : (¬ a ↔ b) ↔ (¬ b ↔ a) :=
 by rw [@iff_def (¬ a), @iff_def (¬ b)]; exact and_congr not_imp_comm imp_not_comm
 
+theorem not_iff [decidable a] [decidable b] : ¬ (a ↔ b) ↔ (¬ a ↔ b) :=
+by split; intro h; [split, skip]; intro h'; [by_contradiction,intro,skip];
+   try { refine h _; simp [*] }; rw [h',not_iff_self] at h; exact h
+
 theorem iff_not_comm [decidable a] [decidable b] : (a ↔ ¬ b) ↔ (b ↔ ¬ a) :=
 by rw [@iff_def a, @iff_def b]; exact and_congr imp_not_comm not_imp_comm
+
+theorem iff_iff_and_or_not_and_not [decidable b] : (a ↔ b) ↔ (a ∧ b) ∨ (¬ a ∧ ¬ b) :=
+by { split; intro h,
+     { rw h; by_cases b; [left,right]; split; assumption },
+     { cases h with h h; cases h; split; intro; { contradiction <|> assumption } } }
 
 @[simp] theorem not_and_not_right [decidable b] : ¬(a ∧ ¬b) ↔ (a → b) :=
 ⟨λ h ha, h.imp_symm $ and.intro ha, λ h ⟨ha, hb⟩, hb $ h ha⟩
@@ -294,7 +330,8 @@ variables {α : Sort*} {a b : α}
 @[simp] theorem heq_iff_eq : a == b ↔ a = b :=
 ⟨eq_of_heq, heq_of_eq⟩
 
-theorem proof_irrel_heq {p q : Prop} (e : p = q) (hp : p) (hq : q) : hp == hq :=
+theorem proof_irrel_heq {p q : Prop} (hp : p) (hq : q) : hp == hq :=
+have p = q, from propext ⟨λ _, hq, λ _, hp⟩,
 by subst q; refl
 
 theorem ne_of_mem_of_not_mem {α β} [has_mem α β] {s : β} {a b : α}
@@ -303,6 +340,14 @@ mt $ λ e, e ▸ h
 
 theorem eq_equivalence : equivalence (@eq α) :=
 ⟨eq.refl, @eq.symm _, @eq.trans _⟩
+
+lemma heq_of_eq_mp :
+  ∀ {α β : Sort*} {a : α} {a' : β} (e : α = β) (h₂ : (eq.mp e a) = a'), a == a'
+| α ._ a a' rfl h := eq.rec_on h (heq.refl _)
+
+lemma rec_heq_of_heq {β} {C : α → Sort*} {x : C a} {y : β} (eq : a = b) (h : x == y) :
+  @eq.rec α a C x b eq == y :=
+by subst eq; exact h
 
 end equality
 
@@ -465,6 +510,8 @@ or_iff_not_imp_left
 protected theorem or_iff_not_imp_right {p q : Prop} : q ∨ p ↔ (¬ p → q) :=
 or_iff_not_imp_right
 
+protected lemma not_not {p : Prop} : ¬¬p ↔ p := not_not
+
 /- use shortened names to avoid conflict when classical namespace is open -/
 noncomputable theorem dec (p : Prop) : decidable p := by apply_instance
 noncomputable theorem dec_pred (p : α → Prop) : decidable_pred p := by apply_instance
@@ -472,10 +519,19 @@ noncomputable theorem dec_rel (p : α → α → Prop) : decidable_rel p := by a
 noncomputable theorem dec_eq (α : Sort*) : decidable_eq α := by apply_instance
 
 @[elab_as_eliminator]
-noncomputable def {u} rec_on {C : Sort u} (h : ∃ a, p a) (H : ∀ a, p a → C) : C :=
-H (classical.some h) (classical.some_spec h)
+noncomputable def {u} exists_cases {C : Sort u} (H0 : C) (H : ∀ a, p a → C) : C :=
+if h : ∃ a, p a then H (classical.some h) (classical.some_spec h) else H0
+
+lemma some_spec2 {α : Type*} {p : α → Prop} {h : ∃a, p a}
+  (q : α → Prop) (hpq : ∀a, p a → q a) : q (some h) :=
+hpq _ $ some_spec _
 
 end classical
+
+@[elab_as_eliminator]
+noncomputable def {u} exists.classical_rec_on
+ {α} {p : α → Prop} (h : ∃ a, p a) {C : Sort u} (H : ∀ a, p a → C) : C :=
+H (classical.some h) (classical.some_spec h)
 
 /-
    bounded quantifiers

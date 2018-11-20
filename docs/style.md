@@ -48,7 +48,7 @@ open nat eq.ops
 
 ### Structuring definitions and theorems ###
 
-Use spaces around ":" and ":=". Put them before a line break rather
+Use spaces around ":", ":=" or infix operators. Put them before a line break rather
 than at the beginning of the next line.
 
 Use two spaces to indent. You can use an extra indent when a long line
@@ -253,7 +253,7 @@ theorem reverse_reverse : ∀ (l : list α), reverse (reverse l) = l
 ```
 
 
-### Tactic mode ###
+### Tactic mode ###
 
 When opening a tactic block, `begin` is not indented but everything
 inside is indented, as in:
@@ -263,7 +263,7 @@ lemma div_self (a : α) : a ≠ 0 → a / a = (1:α) :=
 begin
   intro hna,
   have wit_aa := quotient_mul_add_remainder_eq a a,
-  have a_mod_a := mod_self a, 
+  have a_mod_a := mod_self a,
   dsimp [(%)] at a_mod_a,
   simp [a_mod_a] at wit_aa,
   have h1 : 1 * a = a, from one_mul a,
@@ -303,6 +303,16 @@ begin
       ⟨u, ⟨hu₂, hu₁⟩, by simpa using hu₃⟩ },
   { suffices : a ∈ (⋃₀ b), { simpa [and_comm] },
     { rw [hb.2.1], trivial } }
+end
+```
+
+Often `t0 ; t1` is used to execute `t0` and then `t1` on all new goals. But `;` is not a `,` so
+either write the tactics in one line, or indent the following tacic.
+
+```lean
+begin
+  case x;
+    simp [a, b, c, d]
 end
 ```
 

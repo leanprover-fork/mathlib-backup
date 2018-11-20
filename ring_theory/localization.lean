@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2018 Kenny Lau. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Kenny Lau
+Authors: Kenny Lau, Mario Carneiro
 -/
 import tactic.ring data.quot ring_theory.ideals group_theory.submonoid
 
@@ -42,32 +42,25 @@ instance : setoid (α × S) :=
 
 def loc := quotient $ localization.setoid α S
 
-private def add_aux : α × S → α × S → loc α S :=
-λ ⟨r₁, s₁, hs₁⟩ ⟨r₂, s₂, hs₂⟩, ⟦⟨s₁ * r₂ + s₂ * r₁, s₁ * s₂, is_submonoid.mul_mem hs₁ hs₂⟩⟧
-
 instance : has_add (loc α S) :=
-⟨quotient.lift₂ (add_aux α S) $
+⟨quotient.lift₂
+  (λ x y : α × S, (⟦⟨x.2 * y.1 + y.2 * x.1, _, is_submonoid.mul_mem x.2.2 y.2.2⟩⟧ : loc α S)) $
   λ ⟨r₁, s₁, hs₁⟩ ⟨r₂, s₂, hs₂⟩ ⟨r₃, s₃, hs₃⟩ ⟨r₄, s₄, hs₄⟩ ⟨t₅, hts₅, ht₅⟩ ⟨t₆, hts₆, ht₆⟩,
   quotient.sound ⟨t₆ * t₅, is_submonoid.mul_mem hts₆ hts₅,
     calc (s₁ * s₂ * (s₃ * r₄ + s₄ * r₃) - s₃ * s₄ * (s₁ * r₂ + s₂ * r₁)) * (t₆ * t₅) =
       s₁ * s₃ * ((s₂ * r₄ - s₄ * r₂) * t₆) * t₅ + s₂ * s₄ * ((s₁ * r₃ - s₃ * r₁) * t₅) * t₆ : by ring
       ... = 0 : by rw [ht₆, ht₅]; simp⟩⟩
 
-private def neg_aux : α × S → loc α S :=
-λ ⟨r, s, hs⟩, ⟦⟨-r, s, hs⟩⟧
-
 instance : has_neg (loc α S) :=
-⟨quotient.lift (neg_aux α S) $
+⟨quotient.lift (λ x : α × S, (⟦⟨-x.1, x.2⟩⟧ : loc α S)) $
   λ ⟨r₁, s₁, hs₁⟩ ⟨r₂, s₂, hs₂⟩ ⟨t, hts, ht⟩,
   quotient.sound ⟨t, hts,
     calc (s₁ * -r₂ - s₂ * -r₁) * t = -((s₁ * r₂ - s₂ * r₁) * t) : by ring
       ... = 0 : by rw ht; simp⟩⟩
 
-private def mul_aux : α × S → α × S → loc α S :=
-λ ⟨r₁, s₁, hs₁⟩ ⟨r₂, s₂, hs₂⟩, ⟦⟨r₁ * r₂, s₁ * s₂, is_submonoid.mul_mem hs₁ hs₂⟩⟧
-
 instance : has_mul (loc α S) :=
-⟨quotient.lift₂ (mul_aux α S) $
+⟨quotient.lift₂
+  (λ x y : α × S, (⟦⟨x.1 * y.1, _, is_submonoid.mul_mem x.2.2 y.2.2⟩⟧ : loc α S)) $
   λ ⟨r₁, s₁, hs₁⟩ ⟨r₂, s₂, hs₂⟩ ⟨r₃, s₃, hs₃⟩ ⟨r₄, s₄, hs₄⟩ ⟨t₅, hts₅, ht₅⟩ ⟨t₆, hts₆, ht₆⟩,
   quotient.sound ⟨t₆ * t₅, is_submonoid.mul_mem hts₆ hts₅,
     calc ((s₁ * s₂) * (r₃ * r₄) - (s₃ * s₄) * (r₁ * r₂)) * (t₆ * t₅) =
@@ -116,53 +109,42 @@ localization.comm_ring α (powers x)
 
 section at_prime
 
-variables (P : set α) [is_prime_ideal P]
+variables (P : ideal α) [hp : ideal.is_prime P]
+include hp
 
 instance prime.is_submonoid :
-  is_submonoid (set.compl P) :=
-{ one_mem := λ h, is_proper_ideal.ne_univ P $ is_submodule.univ_of_one_mem P h,
-  mul_mem := λ x y hnx hny hxy, or.cases_on (is_prime_ideal.mem_or_mem_of_mul_mem hxy) hnx hny }
+  is_submonoid (set.compl ↑P) :=
+{ one_mem := P.ne_top_iff_one.1 hp.1,
+  mul_mem := λ x y hnx hny hxy, or.cases_on (hp.2 hxy) hnx hny }
 
 def at_prime := loc α (set.compl P)
 
 instance at_prime.comm_ring : comm_ring (at_prime P) :=
 localization.comm_ring α (set.compl P)
 
-instance at_prime.local_ring : local_ring (at_prime P) :=
+instance at_prime.local_ring : is_local_ring (at_prime P) :=
 local_of_nonunits_ideal
   (λ hze,
     let ⟨t, hts, ht⟩ := quotient.exact hze in
     hts $ have htz : t = 0, by simpa using ht,
       suffices (0:α) ∈ P, by rwa htz,
-      @is_submodule.zero _ _ _ _ P _)
-  (λ x y hx hy ⟨z, hz⟩,
-    let ⟨⟨r₁, s₁, hs₁⟩, hrs₁⟩ := quotient.exists_rep x,
-        ⟨⟨r₂, s₂, hs₂⟩, hrs₂⟩ := quotient.exists_rep y,
-        ⟨⟨r₃, s₃, hs₃⟩, hrs₃⟩ := quotient.exists_rep z in
-    have _,
-      by rw [← hrs₁, ← hrs₂, ← hrs₃] at hz; from quotient.exact hz,
-    let ⟨t, hts, ht⟩ := this in
-    have hr₁ : r₁ ∈ P,
-      from classical.by_contradiction $ λ hnr₁, hx ⟨⟦⟨s₁, r₁, hnr₁⟩⟧,
-        by rw ←hrs₁; from (quotient.sound $ r_of_eq $ by simp [mul_comm])⟩,
-    have hr₂ : r₂ ∈ P,
-      from classical.by_contradiction $ λ hnr₂, hy ⟨⟦⟨s₂, r₂, hnr₂⟩⟧,
-        by rw ←hrs₂; from (quotient.sound $ r_of_eq $ by simp [mul_comm])⟩,
-    have hr₃ : _ ,
-      from or.resolve_right (mem_or_mem_of_mul_eq_zero P ht) hts,
-    have h : s₃ * (s₁ * s₂) - r₃ * (s₁ * r₂ + s₂ * r₁) ∈ P,
-      by simpa using hr₃,
-    have h1 : r₃ * (s₁ * r₂ + s₂ * r₁) ∈ P,
-      from is_submodule.smul r₃ $
-        is_submodule.add (is_submodule.smul s₁ hr₂) (is_submodule.smul s₂ hr₁),
-    have h2 : s₃ * (s₁ * s₂) ∈ P,
-      from calc s₃ * (s₁ * s₂) =
-          s₃ * (s₁ * s₂) - r₃ * (s₁ * r₂ + s₂ * r₁) + r₃ * (s₁ * r₂ + s₂ * r₁) :
-            eq.symm $ sub_add_cancel _ _
-        ... ∈ P : is_submodule.add h h1,
-    have h3 : s₁ * s₂ ∈ P,
-      from or.resolve_left (is_prime_ideal.mem_or_mem_of_mul_mem h2) hs₃,
-    or.cases_on (is_prime_ideal.mem_or_mem_of_mul_mem h3) hs₁ hs₂)
+      P.zero_mem)
+  (begin
+    rintro ⟨⟨r₁, s₁, hs₁⟩⟩ ⟨⟨r₂, s₂, hs₂⟩⟩ hx hy hu,
+    rcases is_unit_iff_exists_inv.1 hu with ⟨⟨⟨r₃, s₃, hs₃⟩⟩, hz⟩,
+    rcases quotient.exact hz with ⟨t, hts, ht⟩,
+    simp at ht,
+    have : ∀ {r s hs}, (⟦⟨r, s, hs⟩⟧ : at_prime P) ∈ nonunits (at_prime P) → r ∈ P,
+    { haveI := classical.dec,
+      exact λ r s hs, not_imp_comm.1 (λ nr,
+        is_unit_iff_exists_inv.2 ⟨⟦⟨s, r, nr⟩⟧,
+          quotient.sound $ r_of_eq $ by simp [mul_comm]⟩) },
+    have hr₃ := (hp.mem_or_mem_of_mul_eq_zero ht).resolve_right hts,
+    have := (ideal.add_mem_iff_left _ _).1 hr₃,
+    { exact not_or (mt hp.mem_or_mem (not_or hs₁ hs₂)) hs₃ (hp.mem_or_mem this) },
+    { exact P.neg_mem (P.mul_mem_right
+        (P.add_mem (P.mul_mem_left (this hy)) (P.mul_mem_left (this hx)))) }
+  end)
 
 end at_prime
 
@@ -185,11 +167,9 @@ section quotient_ring
 
 variables {β : Type u} [integral_domain β] [decidable_eq β]
 
-lemma ne_zero_of_mem_non_zero_divisors {x : β} :
-  x ∈ localization.non_zero_divisors β → x ≠ 0 :=
-λ hm hz,
-  have 1 * x = 0, by simp [hz],
-  zero_ne_one (hm 1 this).symm
+lemma ne_zero_of_mem_non_zero_divisors {x : β}
+  (hm : x ∈ localization.non_zero_divisors β) : x ≠ 0 | hz :=
+zero_ne_one (hm 1 (by simpa)).symm
 
 lemma eq_zero_of_ne_zero_of_mul_eq_zero {x y : β} :
   x ≠ 0 → y * x = 0 → y = 0 :=
@@ -201,7 +181,7 @@ lemma mem_non_zero_divisors_of_ne_zero {x : β} :
 
 variable (β)
 
-private def inv_aux : β × (non_zero_divisors β) → quotient_ring β :=
+def inv_aux : β × (non_zero_divisors β) → quotient_ring β :=
 λ ⟨r, s, hs⟩, if h : r = 0 then 0 else ⟦⟨s, r, mem_non_zero_divisors_of_ne_zero h⟩⟧
 
 instance : has_inv (quotient_ring β) :=
@@ -214,16 +194,22 @@ instance : has_inv (quotient_ring β) :=
     by_cases hr₂ : r₂ = 0;
     simp [hr₁, hr₂] at hrs; simp [inv_aux, hr₁, hr₂],
     { exfalso,
-      exact ne_zero_of_mem_non_zero_divisors hs₁
-        (eq_zero_of_ne_zero_of_mul_eq_zero hr₂ hrs) },
+      exact ne_zero_of_mem_non_zero_divisors hs₁ hrs },
     { exfalso,
-      exact ne_zero_of_mem_non_zero_divisors hs₂
-        (eq_zero_of_ne_zero_of_mul_eq_zero hr₁ hrs.symm) },
+      exact ne_zero_of_mem_non_zero_divisors hs₂ hrs },
     { apply r_of_eq,
       simpa [mul_comm] using hrs.symm }
   end⟩
 
-def quotient_ring.field.of_integral_domain : field (quotient_ring β) :=
+instance : decidable_eq (quotient_ring β) :=
+@quotient.decidable_eq (β × non_zero_divisors β) (localization.setoid β (non_zero_divisors β)) $
+λ ⟨r₁, s₁, hs₁⟩ ⟨r₂, s₂, hs₂⟩, show decidable (∃ t ∈ non_zero_divisors β, (s₁ * r₂ - s₂ * r₁) * t = 0),
+from decidable_of_iff (s₁ * r₂ - s₂ * r₁ = 0)
+⟨λ H, ⟨1, λ y, (mul_one y).symm ▸ id, H.symm ▸ zero_mul _⟩,
+λ ⟨t, ht1, ht2⟩, or.resolve_right (mul_eq_zero.1 ht2) $ λ ht,
+  one_ne_zero (ht1 1 ((one_mul t).symm ▸ ht))⟩
+
+def quotient_ring.field.of_integral_domain : discrete_field (quotient_ring β) :=
 by refine
 { inv            := has_inv.inv,
   zero_ne_one    := λ hzo,
@@ -231,7 +217,9 @@ by refine
     zero_ne_one (by simpa using hts _ ht : 0 = 1),
   mul_inv_cancel := quotient.ind _,
   inv_mul_cancel := quotient.ind _,
-  ..localization.comm_ring β _ };
+  has_decidable_eq := localization.decidable_eq β,
+  inv_zero := dif_pos rfl,
+  .. localization.comm_ring β _ };
 { intros x hnx,
   rcases x with ⟨x, z, hz⟩,
   have : x ≠ 0,

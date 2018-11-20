@@ -55,6 +55,14 @@ noncomputable def finite.to_finset {s : set α} (h : finite s) : finset α :=
 @[simp] theorem finite.mem_to_finset {s : set α} {h : finite s} {a : α} : a ∈ h.to_finset ↔ a ∈ s :=
 @mem_to_finset _ _ (finite.fintype h) _
 
+theorem finite.exists_finset {s : set α} : finite s →
+  ∃ s' : finset α, ∀ a : α, a ∈ s' ↔ a ∈ s
+| ⟨h⟩ := by exactI ⟨to_finset s, λ _, mem_to_finset⟩
+
+theorem finite.exists_finset_coe {s : set α} (hs : finite s) :
+  ∃ s' : finset α, ↑s' = s :=
+let ⟨s', h⟩ := hs.exists_finset in ⟨s', set.ext h⟩
+
 theorem finite_mem_finset (s : finset α) : finite {a | a ∈ s} :=
 ⟨fintype_of_finset s (λ _, iff.rfl)⟩
 
@@ -85,6 +93,20 @@ by rw [fintype_insert', card_fintype_of_finset];
   [fintype s] (h : a ∉ s) {d : fintype.{u} (insert a s : set α)} :
   @fintype.card _ d = fintype.card s + 1 :=
 by rw ← card_fintype_insert' s h; congr
+
+lemma card_image_of_inj_on {s : set α} [fintype s]
+  {f : α → β} [fintype (f '' s)] (H : ∀x∈s, ∀y∈s, f x = f y → x = y) :
+  fintype.card (f '' s) = fintype.card s :=
+by haveI := classical.prop_decidable; exact
+calc fintype.card (f '' s) = (s.to_finset.image f).card : card_fintype_of_finset' _ (by simp)
+... = s.to_finset.card : finset.card_image_of_inj_on
+    (λ x hx y hy hxy, H x (mem_to_finset.1 hx) y (mem_to_finset.1 hy) hxy)
+... = fintype.card s : (card_fintype_of_finset' _ (λ a, mem_to_finset)).symm
+
+lemma card_image_of_injective (s : set α) [fintype s]
+  {f : α → β} [fintype (f '' s)] (H : function.injective f) :
+  fintype.card (f '' s) = fintype.card s :=
+card_image_of_inj_on $ λ _ _ _ _ h, H h
 
 instance fintype_insert [decidable_eq α] (a : α) (s : set α) [fintype s] : fintype (insert a s : set α) :=
 if h : a ∈ s then by rwa [insert_eq, union_eq_self_of_subset_left (singleton_subset_iff.2 h)]
@@ -135,6 +157,12 @@ by rw [show fintype.card ({a} : set α) = _, from
 @[simp] theorem finite_singleton (a : α) : finite ({a} : set α) :=
 ⟨set.fintype_singleton _⟩
 
+instance fintype_pure : ∀ a : α, fintype (pure a : set α) :=
+set.fintype_singleton
+
+theorem finite_pure (a : α) : finite (pure a : set α) :=
+⟨set.fintype_pure a⟩
+
 instance fintype_union [decidable_eq α] (s t : set α) [fintype s] [fintype t] : fintype (s ∪ t : set α) :=
 fintype_of_finset (s.to_finset ∪ t.to_finset) $ by simp
 
@@ -159,8 +187,17 @@ fintype_of_finset (s.to_finset.image f) $ by simp
 instance fintype_range [decidable_eq β] (f : α → β) [fintype α] : fintype (range f) :=
 fintype_of_finset (finset.univ.image f) $ by simp [range]
 
+theorem finite_range (f : α → β) [fintype α] : finite (range f) :=
+by haveI := classical.dec_eq β; exact ⟨by apply_instance⟩
+
 theorem finite_image {s : set α} (f : α → β) : finite s → finite (f '' s)
 | ⟨h⟩ := ⟨@set.fintype_image _ _ (classical.dec_eq β) _ _ h⟩
+
+instance fintype_map {α β} [decidable_eq β] :
+  ∀ (s : set α) (f : α → β) [fintype s], fintype (f <$> s) := set.fintype_image
+
+theorem finite_map {α β} {s : set α} :
+  ∀ (f : α → β), finite s → finite (f <$> s) := finite_image
 
 def fintype_of_fintype_image [decidable_eq β] (s : set α)
   {f : α → β} {g} (I : is_partial_inv f g) [fintype (f '' s)] : fintype s :=
@@ -190,9 +227,22 @@ fintype_of_finset (finset.univ.bind (λ i, (f i).to_finset)) $ by simp
 theorem finite_Union {ι : Type*} [fintype ι] {f : ι → set α} (H : ∀i, finite (f i)) : finite (⋃ i, f i) :=
 ⟨@set.fintype_Union _ (classical.dec_eq α) _ _ _ (λ i, finite.fintype (H i))⟩
 
+def fintype_bUnion [decidable_eq α] {ι : Type*} {s : set ι} [fintype s]
+  (f : ι → set α) (H : ∀ i ∈ s, fintype (f i)) : fintype (⋃ i ∈ s, f i) :=
+by rw bUnion_eq_Union; exact
+@set.fintype_Union _ _ _ _ _ (by rintro ⟨i, hi⟩; exact H i hi)
+
+instance fintype_bUnion' [decidable_eq α] {ι : Type*} {s : set ι} [fintype s]
+  (f : ι → set α) [H : ∀ i, fintype (f i)] : fintype (⋃ i ∈ s, f i) :=
+fintype_bUnion _ (λ i _, H i)
+
 theorem finite_sUnion {s : set (set α)} (h : finite s) (H : ∀t∈s, finite t) : finite (⋃₀ s) :=
-by rw sUnion_eq_Union'; haveI := finite.fintype h;
+by rw sUnion_eq_Union; haveI := finite.fintype h;
    apply finite_Union; simpa using H
+
+theorem finite_bUnion {α} {ι : Type*} {s : set ι} {f : ι → set α} :
+  finite s → (∀i, finite (f i)) → finite (⋃ i∈s, f i)
+| ⟨hs⟩ h := by rw [bUnion_eq_Union]; exactI finite_Union (λ i, h _)
 
 instance fintype_lt_nat (n : ℕ) : fintype {i | i < n} :=
 fintype_of_finset (finset.range n) $ by simp
@@ -208,66 +258,59 @@ fintype_of_finset (s.to_finset.product t.to_finset) $ by simp
 lemma finite_prod {s : set α} {t : set β} : finite s → finite t → finite (set.prod s t)
 | ⟨hs⟩ ⟨ht⟩ := by exactI ⟨set.fintype_prod s t⟩
 
+def fintype_bind {α β} [decidable_eq β] (s : set α) [fintype s]
+  (f : α → set β) (H : ∀ a ∈ s, fintype (f a)) : fintype (s >>= f) :=
+set.fintype_bUnion _ H
+
+instance fintype_bind' {α β} [decidable_eq β] (s : set α) [fintype s]
+  (f : α → set β) [H : ∀ a, fintype (f a)] : fintype (s >>= f) :=
+fintype_bind _ _ (λ i _, H i)
+
+theorem finite_bind {α β} {s : set α} {f : α → set β} :
+  finite s → (∀ a ∈ s, finite (f a)) → finite (s >>= f)
+| ⟨hs⟩ H := ⟨@fintype_bind _ _ (classical.dec_eq β) _ hs _ (λ a ha, (H a ha).fintype)⟩
+
+def fintype_seq {α β : Type u} [decidable_eq β]
+  (f : set (α → β)) (s : set α) [fintype f] [fintype s] :
+  fintype (f <*> s) :=
+by rw seq_eq_bind_map; apply set.fintype_bind'
+
+theorem finite_seq {α β : Type u} {f : set (α → β)} {s : set α} :
+  finite f → finite s → finite (f <*> s)
+| ⟨hf⟩ ⟨hs⟩ := by haveI := classical.dec_eq β; exactI ⟨fintype_seq _ _⟩
+
 end set
 
 namespace finset
-variables [decidable_eq α] [decidable_eq β]
+variables [decidable_eq β]
 variables {s t u : finset α} {f : α → β} {a : α}
-
-/-- Convert a finset to a set in the natural way. -/
-def to_set (s : finset α) : set α := {x | x ∈ s}
-
-instance : has_lift (finset α) (set α) := ⟨to_set⟩
-
-@[simp] lemma mem_coe : a ∈ (↑s : set α) = (a ∈ s) :=
-rfl
 
 lemma finite_to_set (s : finset α) : set.finite (↑s : set α) :=
 set.finite_mem_finset s
 
-@[simp] lemma coe_eq_coe : ((↑s : set α) = ↑t) ↔ s = t :=
-by simp [finset.ext, set.set_eq_def]
-
-@[simp] lemma coe_subseteq_coe : ((↑s : set α) ⊆ ↑t) ↔ s ⊆ t :=
-by simp [finset.subset_iff, set.subset_def]
-
-@[simp] lemma coe_empty : ↑(∅ : finset α) = (∅ : set α) :=
-by simp [set.set_eq_def]
-
-@[simp] lemma coe_insert : ↑(insert a s) = (insert a ↑s : set α) :=
-by simp [set.set_eq_def]
-
-@[simp] lemma coe_erase : ↑(erase s a) = (↑s \ {a} : set α) :=
-by simp [set.set_eq_def, and_comm]
-
-@[simp] lemma coe_sdiff : ↑(s \ t) = (↑s \ ↑t : set α) :=
-by simp [set.set_eq_def]
-
-@[simp] lemma coe_singleton : ↑({a} : finset α) = ({a} : set α) :=
-by simp [set.set_eq_def]
-
-@[simp] lemma coe_union : ↑(s ∪ t) = (↑s ∪ ↑t : set α) :=
-by simp [set.set_eq_def]
-
-@[simp] lemma coe_inter : ↑(s ∩ t) = (↑s ∩ ↑t : set α) :=
-by simp [set.set_eq_def]
-
-@[simp] lemma coe_image {f : α → β} : ↑(s.image f) = f '' ↑s :=
-by simp [set.set_eq_def]
-
 @[simp] lemma coe_bind {f : α → finset β} : ↑(s.bind f) = (⋃x ∈ (↑s : set α), ↑(f x) : set β) :=
-by simp [set.set_eq_def]
-
-@[simp] lemma coe_filter {p : α → Prop} [decidable_pred p] :
-  ↑(s.filter p) = ({x ∈ ↑s | p x} : set α) :=
-by simp [set.set_eq_def]
+by simp [set.ext_iff]
 
 @[simp] lemma coe_to_finset {s : set α} {hs : set.finite s} : ↑(hs.to_finset) = s :=
-by simp [set.set_eq_def]
+by simp [set.ext_iff]
+
+@[simp] lemma coe_to_finset' [decidable_eq α] (s : set α) [fintype s] : (↑s.to_finset : set α) = s :=
+by ext; simp
 
 end finset
 
 namespace set
+
+lemma finite_subset_Union {s : set α} (hs : finite s)
+  {ι} {t : ι → set α} (h : s ⊆ ⋃ i, t i) : ∃ I : set ι, finite I ∧ s ⊆ ⋃ i ∈ I, t i :=
+begin
+  unfreezeI, cases hs,
+  choose f hf using show ∀ x : s, ∃ i, x.1 ∈ t i, {simpa [subset_def] using h},
+  refine ⟨range f, finite_range f, _⟩,
+  rintro x hx,
+  simp,
+  exact ⟨_, ⟨_, hx, rfl⟩, hf ⟨x, hx⟩⟩
+end
 
 lemma infinite_univ_nat : infinite (univ : set ℕ) :=
 assume (h : finite (univ : set ℕ)),
@@ -286,5 +329,27 @@ lemma not_injective_int_fintype [fintype α] [decidable_eq α] {f : ℤ → α} 
 assume hf,
 have injective (f ∘ (coe : ℕ → ℤ)), from injective_comp hf $ assume i j, int.of_nat_inj,
 not_injective_nat_fintype this
+
+lemma card_lt_card {s t : set α} [fintype s] [fintype t] (h : s ⊂ t) :
+  fintype.card s < fintype.card t :=
+begin
+  haveI := classical.prop_decidable,
+  rw [← finset.coe_to_finset' s, ← finset.coe_to_finset' t, finset.coe_ssubset] at h,
+  rw [card_fintype_of_finset' _ (λ x, mem_to_finset),
+      card_fintype_of_finset' _ (λ x, mem_to_finset)],
+  exact finset.card_lt_card h,
+end
+
+lemma card_le_of_subset {s t : set α} [fintype s] [fintype t] (hsub : s ⊆ t) :
+  fintype.card s ≤ fintype.card t :=
+calc fintype.card s = s.to_finset.card : set.card_fintype_of_finset' _ (by simp)
+... ≤ t.to_finset.card : finset.card_le_of_subset (λ x hx, by simp [set.subset_def, *] at *)
+... = fintype.card t : eq.symm (set.card_fintype_of_finset' _ (by simp))
+
+lemma eq_of_subset_of_card_le {s t : set α} [fintype s] [fintype t]
+   (hsub : s ⊆ t) (hcard : fintype.card t ≤ fintype.card s) : s = t :=
+classical.by_contradiction (λ h, lt_irrefl (fintype.card t)
+  (have fintype.card s < fintype.card t := set.card_lt_card ⟨hsub, h⟩,
+    by rwa [le_antisymm (card_le_of_subset hsub) hcard] at this))
 
 end set

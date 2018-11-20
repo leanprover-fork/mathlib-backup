@@ -115,9 +115,23 @@ assume ⟨b, hb⟩,
 have a ≠ a ⊔ b, from assume eq, hb $ eq.symm ▸ le_sup_right,
 ⟨a ⊔ b, lt_of_le_of_ne le_sup_left ‹a ≠ a ⊔ b›⟩
 
+theorem semilattice_sup.ext_sup {α} {A B : semilattice_sup α}
+  (H : ∀ x y : α, (by haveI := A; exact x ≤ y) ↔ x ≤ y)
+  (x y : α) : (by haveI := A; exact (x ⊔ y)) = x ⊔ y :=
+eq_of_forall_ge_iff $ λ c,
+by simp only [sup_le_iff]; rw [← H, @sup_le_iff α A, H, H]
+
+theorem semilattice_sup.ext {α} {A B : semilattice_sup α}
+  (H : ∀ x y : α, (by haveI := A; exact x ≤ y) ↔ x ≤ y) : A = B :=
+begin
+  haveI this := partial_order.ext H,
+  have ss := funext (λ x, funext $ semilattice_sup.ext_sup H x),
+  cases A; cases B; injection this; congr'
+end
+
 end semilattice_sup
 
-/-- A `semilattice_sup` is a meet-semilattice, that is, a partial order
+/-- A `semilattice_inf` is a meet-semilattice, that is, a partial order
   with a meet (a.k.a. glb / greatest lower bound, inf / infimum) operation
   `⊓` which is the greatest element smaller than both factors. -/
 class semilattice_inf (α : Type u) extends has_inf α, partial_order α :=
@@ -187,6 +201,20 @@ assume ⟨b, hb⟩,
 have a ⊓ b ≠ a, from assume eq, hb $ eq ▸ inf_le_right,
 ⟨a ⊓ b, lt_of_le_of_ne inf_le_left ‹a ⊓ b ≠ a›⟩
 
+theorem semilattice_inf.ext_inf {α} {A B : semilattice_inf α}
+  (H : ∀ x y : α, (by haveI := A; exact x ≤ y) ↔ x ≤ y)
+  (x y : α) : (by haveI := A; exact (x ⊓ y)) = x ⊓ y :=
+eq_of_forall_le_iff $ λ c,
+by simp only [le_inf_iff]; rw [← H, @le_inf_iff α A, H, H]
+
+theorem semilattice_inf.ext {α} {A B : semilattice_inf α}
+  (H : ∀ x y : α, (by haveI := A; exact x ≤ y) ↔ x ≤ y) : A = B :=
+begin
+  haveI this := partial_order.ext H,
+  have ss := funext (λ x, funext $ semilattice_inf.ext_inf H x),
+  cases A; cases B; injection this; congr'
+end
+
 end semilattice_inf
 
 /- Lattices -/
@@ -211,6 +239,15 @@ le_antisymm (by finish) (by finish)
 theorem sup_inf_self : a ⊔ (a ⊓ b) = a :=
 le_antisymm (by finish) (by finish)
 
+theorem lattice.ext {α} {A B : lattice α}
+  (H : ∀ x y : α, (by haveI := A; exact x ≤ y) ↔ x ≤ y) : A = B :=
+begin
+  have SS : @lattice.to_semilattice_sup α A =
+            @lattice.to_semilattice_sup α B := semilattice_sup.ext H,
+  have II := semilattice_inf.ext H,
+  resetI, cases A; cases B; injection SS; injection II; congr'
+end
+
 end lattice
 
 variables {α : Type u} {x y z w : α}
@@ -234,28 +271,28 @@ theorem sup_inf_left : x ⊔ (y ⊓ z) = (x ⊔ y) ⊓ (x ⊔ z) :=
 le_antisymm sup_inf_le le_sup_inf
 
 theorem sup_inf_right : (y ⊓ z) ⊔ x = (y ⊔ x) ⊓ (z ⊔ x) :=
-by simp [sup_inf_left, λy:α, @sup_comm α _ y x]
+by simp only [sup_inf_left, λy:α, @sup_comm α _ y x, eq_self_iff_true]
 
 theorem inf_sup_left : x ⊓ (y ⊔ z) = (x ⊓ y) ⊔ (x ⊓ z) :=
 calc x ⊓ (y ⊔ z) = (x ⊓ (x ⊔ z)) ⊓ (y ⊔ z)       : by rw [inf_sup_self]
-             ... = x ⊓ ((x ⊓ y) ⊔ z)             : by simp [inf_assoc, sup_inf_right]
+             ... = x ⊓ ((x ⊓ y) ⊔ z)             : by simp only [inf_assoc, sup_inf_right, eq_self_iff_true]
              ... = (x ⊔ (x ⊓ y)) ⊓ ((x ⊓ y) ⊔ z) : by rw [sup_inf_self]
              ... = ((x ⊓ y) ⊔ x) ⊓ ((x ⊓ y) ⊔ z) : by rw [sup_comm]
              ... = (x ⊓ y) ⊔ (x ⊓ z)             : by rw [sup_inf_left]
 
 theorem inf_sup_right : (y ⊔ z) ⊓ x = (y ⊓ x) ⊔ (z ⊓ x) :=
-by simp [inf_sup_left, λy:α, @inf_comm α _ y x]
+by simp only [inf_sup_left, λy:α, @inf_comm α _ y x, eq_self_iff_true]
 
 lemma eq_of_sup_eq_inf_eq {α : Type u} [distrib_lattice α] {a b c : α}
   (h₁ : b ⊓ a = c ⊓ a) (h₂ : b ⊔ a = c ⊔ a) : b = c :=
 le_antisymm
   (calc b ≤ (c ⊓ a) ⊔ b     : le_sup_right
     ... = (c ⊔ b) ⊓ (a ⊔ b) : sup_inf_right
-    ... = c ⊔ (c ⊓ a)       : by rw [←h₁, sup_inf_left, ←h₂]; simp [sup_comm]
+    ... = c ⊔ (c ⊓ a)       : by rw [←h₁, sup_inf_left, ←h₂]; simp only [sup_comm, eq_self_iff_true]
     ... = c                 : sup_inf_self)
   (calc c ≤ (b ⊓ a) ⊔ c     : le_sup_right
     ... = (b ⊔ c) ⊓ (a ⊔ c) : sup_inf_right
-    ... = b ⊔ (b ⊓ a)       : by rw [h₁, sup_inf_left, h₂]; simp [sup_comm]
+    ... = b ⊔ (b ⊓ a)       : by rw [h₁, sup_inf_left, h₂]; simp only [sup_comm, eq_self_iff_true]
     ... = b                 : sup_inf_self)
 
 end distrib_lattice
@@ -274,6 +311,9 @@ instance lattice_of_decidable_linear_order {α : Type u} [o : decidable_linear_o
   le_inf       := assume a b c, le_min,
   ..o }
 
+theorem sup_eq_max [decidable_linear_order α] : x ⊔ y = max x y := rfl
+theorem inf_eq_min [decidable_linear_order α] : x ⊓ y = min x y := rfl
+
 instance distrib_lattice_of_decidable_linear_order {α : Type u} [o : decidable_linear_order α] : distrib_lattice α :=
 { le_sup_inf := assume a b c,
     match le_total b c with
@@ -286,3 +326,27 @@ instance nat.distrib_lattice : distrib_lattice ℕ :=
 by apply_instance
 
 end lattice
+
+namespace order_dual
+open lattice
+variable (α : Type*)
+
+instance [has_inf α] : has_sup (order_dual α) := ⟨((⊓) : α → α → α)⟩
+instance [has_sup α] : has_inf (order_dual α) := ⟨((⊔) : α → α → α)⟩
+
+instance [semilattice_inf α] : semilattice_sup (order_dual α) :=
+{ le_sup_left  := @inf_le_left α _,
+  le_sup_right := @inf_le_right α _,
+  sup_le := assume a b c hca hcb, @le_inf α _ _ _ _ hca hcb,
+  .. order_dual.partial_order α, .. order_dual.lattice.has_sup α }
+
+instance [semilattice_sup α] : semilattice_inf (order_dual α) :=
+{ inf_le_left  := @le_sup_left α _,
+  inf_le_right := @le_sup_right α _,
+  le_inf := assume a b c hca hcb, @sup_le α _ _ _ _ hca hcb,
+  .. order_dual.partial_order α, .. order_dual.lattice.has_inf α }
+
+instance [lattice α] : lattice (order_dual α) :=
+{ .. order_dual.lattice.semilattice_sup α, .. order_dual.lattice.semilattice_inf α }
+
+end order_dual

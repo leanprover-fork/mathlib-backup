@@ -143,13 +143,13 @@ mem_at_top_sets.mpr $ exists.intro fsts $ assume bs (hbs : fsts ⊆ bs),
     set.ne_empty_iff_exists_mem.mpr $ exists.intro cs' $
     by simp [sum_eq, this]; { intros b hb, simp [cs', hb, finset.subset_union_right] },
   have tendsto (λp:(Πb:β, finset (γ b)), bs.sum (λb, (p b).sum (λc, f ⟨b, c⟩)))
-      (⨅b (h : b ∈ bs), at_top.vmap (λp, p b)) (nhds (bs.sum g)),
+      (⨅b (h : b ∈ bs), at_top.comap (λp, p b)) (nhds (bs.sum g)),
     from tendsto_finset_sum bs $
-      assume c hc, tendsto_infi' c $ tendsto_infi' hc $ tendsto_vmap.comp (hf c),
+      assume c hc, tendsto_infi' c $ tendsto_infi' hc $ tendsto_comap.comp (hf c),
   have bs.sum g ∈ s,
     from mem_closure_of_tendsto this hsc $ forall_sets_neq_empty_iff_neq_bot.mp $
       by simp [mem_inf_sets, exists_imp_distrib, and_imp, forall_and_distrib,
-               filter.mem_infi_sets_finset, mem_vmap_sets, skolem, mem_at_top_sets,
+               filter.mem_infi_sets_finset, mem_comap_sets, skolem, mem_at_top_sets,
                and_comm];
       from
         assume s₁ s₂ s₃ hs₁ hs₃ p hs₂ p' hp cs hp',
@@ -202,7 +202,7 @@ have j_inj : ∀x y (hx : f x ≠ 0) (hy : f y ≠ 0), (j hx = j hy ↔ x = y),
 let ii : finset γ → finset β := λu, u.bind $ λc, if h : g c = 0 then ∅ else {i h} in
 let jj : finset β → finset γ := λv, v.bind $ λb, if h : f b = 0 then ∅ else {j h} in
 is_sum_of_is_sum $ assume u, exists.intro (ii u) $
-  assume v hv, exists.intro (u ∪ jj v) $ and.intro subset_union_left $
+  assume v hv, exists.intro (u ∪ jj v) $ and.intro (subset_union_left _ _) $
   have ∀c:γ, c ∈ u ∪ jj v → c ∉ jj v → g c = 0,
     from assume c hc hnc, classical.by_contradiction $ assume h : g c ≠ 0,
     have c ∈ u,
@@ -212,7 +212,7 @@ is_sum_of_is_sum $ assume u, exists.intro (ii u) $
     have j (hi h) ∈ jj v,
       by simp [mem_bind]; existsi i h; simp [h, hi, this],
     by rw [hji h] at this; exact hnc this,
-  calc (u ∪ jj v).sum g = (jj v).sum g : (sum_subset subset_union_right this).symm
+  calc (u ∪ jj v).sum g = (jj v).sum g : (sum_subset (subset_union_right _ _) this).symm
     ... = v.sum _ : sum_bind $ by intros x hx y hy hxy; by_cases f x = 0; by_cases f y = 0; simp [*]
     ... = v.sum f : sum_congr rfl $ by intros x hx; by_cases f x = 0; simp [*]
 
@@ -251,6 +251,9 @@ tsum_eq_is_sum $ is_sum_sum $ assume i hi, is_sum_tsum $ hf i hi
 lemma tsum_eq_sum {f : β → α} {s : finset β} (hf : ∀b∉s, f b = 0)  :
   (∑b, f b) = s.sum f :=
 tsum_eq_is_sum $ is_sum_sum_of_ne_finset_zero hf
+
+lemma tsum_fintype [fintype β] (f : β → α) : (∑b, f b) = finset.univ.sum f :=
+tsum_eq_sum $ λ a h, h.elim (mem_univ _)
 
 lemma tsum_eq_single {f : β → α} (b : β) (hf : ∀b' ≠ b, f b' = 0)  :
   (∑b, f b) = f b :=
@@ -307,6 +310,9 @@ lemma tsum_eq_tsum_of_iso (j : γ → β) (i : β → γ)
   (∑c, f (j c)) = (∑b, f b) :=
 tsum_eq_tsum_of_is_sum_iff_is_sum $ assume a, is_sum_iff_is_sum_of_iso i h₁ h₂
 
+lemma tsum_equiv (j : γ ≃ β) : (∑c, f (j c)) = (∑b, f b) :=
+tsum_eq_tsum_of_iso j j.symm (by simp) (by simp)
+
 end tsum
 
 section topological_group
@@ -342,27 +348,27 @@ section topological_semiring
 variables [semiring α] [topological_space α] [topological_semiring α]
 variables {f g : β → α} {a a₁ a₂ : α}
 
-lemma is_sum_mul_left : is_sum f a₁ → is_sum (λb, a₂ * f b) (a₂ * a₁) :=
+lemma is_sum_mul_left (a₂) : is_sum f a₁ → is_sum (λb, a₂ * f b) (a₂ * a₁) :=
 is_sum_hom _ (by simp) (by simp [mul_add]) (continuous_mul continuous_const continuous_id)
 
-lemma is_sum_mul_right (hf : is_sum f a₁) : is_sum (λb, f b * a₂) (a₁ * a₂) :=
+lemma is_sum_mul_right (a₂) (hf : is_sum f a₁) : is_sum (λb, f b * a₂) (a₁ * a₂) :=
 @is_sum_hom _ _ _ _ _ _ f a₁ (λa, a * a₂) _ _ _
   (by simp) (by simp [add_mul]) (continuous_mul continuous_id continuous_const) hf
 
-lemma has_sum_mul_left (hf : has_sum f) : has_sum (λb, a * f b) :=
-has_sum_spec $ is_sum_mul_left $ is_sum_tsum hf
+lemma has_sum_mul_left (a) (hf : has_sum f) : has_sum (λb, a * f b) :=
+has_sum_spec $ is_sum_mul_left _ $ is_sum_tsum hf
 
-lemma has_sum_mul_right (hf : has_sum f) : has_sum (λb, f b * a) :=
-has_sum_spec $ is_sum_mul_right $ is_sum_tsum hf
+lemma has_sum_mul_right (a) (hf : has_sum f) : has_sum (λb, f b * a) :=
+has_sum_spec $ is_sum_mul_right _ $ is_sum_tsum hf
 
 section tsum
 variables [t2_space α]
 
-lemma tsum_mul_left (hf : has_sum f) : (∑b, a * f b) = a * (∑b, f b) :=
-tsum_eq_is_sum $ is_sum_mul_left $ is_sum_tsum hf
+lemma tsum_mul_left (a) (hf : has_sum f) : (∑b, a * f b) = a * (∑b, f b) :=
+tsum_eq_is_sum $ is_sum_mul_left _ $ is_sum_tsum hf
 
-lemma tsum_mul_right (hf : has_sum f) : (∑b, f b * a) = (∑b, f b) * a :=
-tsum_eq_is_sum $ is_sum_mul_right $ is_sum_tsum hf
+lemma tsum_mul_right (a) (hf : has_sum f) : (∑b, f b * a) = (∑b, f b) * a :=
+tsum_eq_is_sum $ is_sum_mul_right _ $ is_sum_tsum hf
 
 end tsum
 
@@ -427,7 +433,7 @@ suffices cauchy (at_top.map (λs:finset β, s.sum f')),
   have ∀{u₁ u₂}, t ⊆ u₁ → t ⊆ u₂ → (u₁.sum f', u₂.sum f') ∈ s',
     from assume u₁ u₂ h₁ h₂,
     have ((t ∪ u₁.filter (λb, f' b ≠ 0)).sum f, (t ∪ u₂.filter (λb, f' b ≠ 0)).sum f) ∈ s,
-      from ht _ _ subset_union_left subset_union_left,
+      from ht _ _ (subset_union_left _ _) (subset_union_left _ _),
     have ((t ∪ u₁.filter (λb, f' b ≠ 0)).sum f - d, (t ∪ u₂.filter (λb, f' b ≠ 0)).sum f - d) ∈ s',
       from hss' this $ refl_mem_uniformity hs,
     by rwa [eq h₁, eq h₂] at this,
