@@ -13,6 +13,8 @@ instance : linear_order (fin n) :=
   lt               := λ a b, nat.lt a.1 b.1,
   lt_iff_le_not_le := λ a b, @nat.lt_iff_le_not_le a.1 b.1}
 
+@[extensionality] lemma le_ext {a b : fin n} (h : a.val ≤ b.val) : a ≤ b := h
+
 end fin
 
 namespace simplex_category
@@ -32,16 +34,15 @@ lemma δ_monotone (i : [n+1]) : monotone (δ i) :=
 begin
   intros a b H,
   dsimp [fin.succ_above],
-  split_ifs with ha hb; try {tidy},
-  { exact nat.le_trans H (nat.le_succ b.val),
-    dsimp [fin.cast_succ,fin.cast_add],
+  split_ifs with ha hb,
+  { exact H },
+  { ext1, simp,
+    exact nat.le_trans H (nat.le_succ b.val) },
+  { ext1, simp,
+    change a.val ≤ b.val at H,
     exfalso,
-    -- exact hb (nat.le_trans ha H),
-    sorry },
-  { --show a.val ≤ b.succ.val,
-    simp,
-    exact nat.le_trans H (nat.le_succ b) },
-  { exact H }
+    exact ha (lt_of_le_of_lt H h) },
+  { ext1, simp, exact nat.succ_le_succ H }
 end
 
 lemma σ_monotone (i : [n]) : monotone (σ i) :=
@@ -62,22 +63,23 @@ begin
   { exact nat.pred_le_pred H }
 end
 
-lemma simplicial_identity₁ {i j : [n+1]} (H : i ≤ j) : δ j.succ ∘ δ i = δ i.raise ∘ δ j :=
+lemma simplicial_identity₁ {i j : [n+1]} (H : i ≤ j) : δ j.succ ∘ δ i = δ i.cast_succ ∘ δ j :=
 begin
   funext a,
-  simp [function.comp, δ],
-  by_cases hja : (j.val ≤ a.val),
-  { have hja' : ((fin.succ j).val ≤ (fin.succ a).val) :=
+  dsimp [fin.succ_above],
+  by_cases hja : (j.val < a.val),
+  { have hja' : ((fin.succ j).val < (fin.succ a).val) :=
     begin
       simp,
       exact nat.succ_le_succ hja,
     end,
-    have hia : ((fin.raise i).val ≤ (fin.succ a).val) :=
+    have hia : ((i.cast_succ).val < (fin.succ a).val) :=
     begin
       simp,
-      exact nat.le_trans H (nat.le_trans hja (nat.le_succ a.val))
+      refine (lt_of_le_of_lt H _),
+      exact (nat.le_trans hja (nat.le_succ a.val))
     end,
-    rw [dif_pos hja, dif_pos (nat.le_trans H hja), dif_pos hja', dif_pos hia]},
+    rw [if_pos hja, if_pos (nat.le_trans H hja), if_pos hja', if_pos hia]},
   { rw [dif_neg hja],
     by_cases hia : (i.val ≤ a.val),
     { have hia' : ((fin.raise i).val ≤ (fin.raise a).val) := hia,

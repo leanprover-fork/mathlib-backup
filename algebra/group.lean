@@ -721,10 +721,6 @@ theorem inv_is_group_anti_hom [group α] : is_group_anti_hom (λ x : α, x⁻¹)
 namespace is_add_group_hom
 variables [add_group α] [add_group β] (f : α → β) [is_add_group_hom f]
 
-def ker {α β : Type*} [add_group α] [add_group β] (f : α → β) [hf : is_add_group_hom f] :
-set α :=
-{ x | f x = 0 }
-
 lemma sub (a b) : f (a - b) = f a - f b :=
 calc f (a - b) = f (a + -b)   : rfl
            ... = f a + f (-b) : add f _ _
