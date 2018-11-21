@@ -1,4 +1,4 @@
-import data.fin order.basic tactic.split_ifs
+import data.fin order.basic tactic.split_ifs tactic.tidy tactic.linarith tactic.monotonicity
 
 variables {n : ℕ}
 
@@ -18,14 +18,12 @@ end fin
 namespace simplex_category
 local notation ` [`n`] ` := fin (n+1)
 
-/-- The i-th face map from [n] to [n+1] -/
-def δ (i : [n+1]) (a : [n]) : [n+1] :=
-if h : i.val ≤ a.val then a.succ else a.raise
+local notation `δ` := fin.succ_above
 
 /-- The i-th degeneracy map from [n+1] to [n] -/
 def σ (i : [n]) (a : [n+1]) : [n] :=
 if h : a.val ≤ i.val
-then ⟨a.val, lt_of_le_of_lt h i.is_lt⟩
+then a.cast_lt (lt_of_le_of_lt h i.is_lt)
 else ⟨a.val.pred,
   (nat.sub_lt_right_iff_lt_add (lt_of_le_of_lt i.val.zero_le (not_le.mp h))).mpr a.is_lt⟩
   --a.pred sorry
@@ -33,14 +31,14 @@ else ⟨a.val.pred,
 lemma δ_monotone (i : [n+1]) : monotone (δ i) :=
 begin
   intros a b H,
-  unfold δ,
-  split_ifs with ha hb,
-  { show a.succ.val ≤ b.succ.val,
-    simp,
-    exact nat.succ_le_succ H },
-  { exfalso,
-    exact hb (nat.le_trans ha H) },
-  { show a.val ≤ b.succ.val,
+  dsimp [fin.succ_above],
+  split_ifs with ha hb; try {tidy},
+  { exact nat.le_trans H (nat.le_succ b.val),
+    dsimp [fin.cast_succ,fin.cast_add],
+    exfalso,
+    -- exact hb (nat.le_trans ha H),
+    sorry },
+  { --show a.val ≤ b.succ.val,
     simp,
     exact nat.le_trans H (nat.le_succ b) },
   { exact H }
@@ -83,7 +81,7 @@ begin
   { rw [dif_neg hja],
     by_cases hia : (i.val ≤ a.val),
     { have hia' : ((fin.raise i).val ≤ (fin.raise a).val) := hia,
-      
+
       have hja' : ¬(j.succ.val ≤ a.succ.val) :=
       begin
         simp at *,
