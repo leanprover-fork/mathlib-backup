@@ -31,26 +31,16 @@ else ⟨a.val.pred,
   --a.pred sorry
 
 lemma δ_monotone (i : [n+1]) : monotone (δ i) :=
-begin
-  intros a b H,
-  dsimp [fin.succ_above],
-  split_ifs with ha hb,
-  { exact H },
-  { ext1, simp,
-    exact nat.le_trans H (nat.le_succ b.val) },
-  { ext1, simp,
-    change a.val ≤ b.val at H,
-    exfalso,
-    exact ha (lt_of_le_of_lt H h) },
-  { ext1, simp, exact nat.succ_le_succ H }
-end
+λ a b (H : a.val ≤ b.val),
+by dsimp [fin.succ_above]; split_ifs with ha hb; { ext1, simp [nat.succ_eq_add_one], linarith }
 
 lemma σ_monotone (i : [n]) : monotone (σ i) :=
 begin
   intros a b H,
+  change a.val ≤ b.val at H,
   unfold σ,
-  split_ifs with ha hb,
-  { exact H },
+  split_ifs with ha hb;
+  try { ext1, simp, linarith },
   { simp at hb,
     have hb' : i.val ≤ nat.pred b.val :=
     begin
@@ -58,8 +48,6 @@ begin
       exact nat.pred_le_pred hb
     end,
     exact nat.le_trans ha hb' },
-  { exfalso,
-    exact ha (nat.le_trans H h) },
   { exact nat.pred_le_pred H }
 end
 
