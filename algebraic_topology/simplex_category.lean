@@ -1,8 +1,10 @@
-import data.fin order.basic tactic.split_ifs tactic.tidy tactic.linarith tactic.monotonicity
-
-variables {n : ℕ}
+import data.fin order.basic
+import category_theory.category
+import tactic.split_ifs
+import tactic.tidy tactic.linarith tactic.monotonicity
 
 namespace fin
+variables {n : ℕ}
 
 instance : linear_order (fin n) :=
 { le               := λ a b, nat.less_than_or_equal a.1 b.1,
@@ -15,29 +17,48 @@ instance : linear_order (fin n) :=
 
 @[extensionality] lemma le_ext {a b : fin n} (h : a.val ≤ b.val) : a ≤ b := h
 
+attribute [extensionality] fin.eq_of_veq
+
 end fin
 
-namespace simplex_category
-local notation ` [`n`] ` := fin (n+1)
+inductive simplex_category
+| from_nat : ℕ → simplex_category
 
-local notation `δ` := fin.succ_above
+namespace simplex_category
+
+local notation ` [`n`] ` := from_nat n
+
+instance : has_coe_to_sort simplex_category :=
+{ S := Type,
+  coe := λ n, simplex_category.cases_on n (λ n, fin $ n+1) }
+
+instance {Δ : simplex_category} : linear_order Δ := by cases Δ; unfold_coes; apply_instance
+
+instance : category_theory.category simplex_category :=
+{ hom := λ Δ Δ', {f : Δ → Δ' // monotone f},
+  id := λ _, ⟨_, monotone_id⟩,
+  comp := λ _ _ _ f g, ⟨_, monotone_comp f.2 g.2⟩ }
+
+@[extensionality] lemma hom_ext {Δ Δ' : simplex_category} {f g : Δ ⟶ Δ'} (h : f.1 = g.1) : f = g := by tidy
+
+@[simp] lemma comp_val {Δ Δ' Δ'' : simplex_category} {f : Δ ⟶ Δ'} {g : Δ' ⟶ Δ''} : (f ≫ g).val = g.val ∘ f.val := rfl
+
+def δ {n} (i : [n+1]) : [n] ⟶ [n+1] :=
+{ val := fin.succ_above i,
+  property := λ a b (H : a.val ≤ b.val),
+    by dsimp [fin.succ_above]; split_ifs with ha hb; { ext1, simp [nat.succ_eq_add_one], linarith } }
 
 /-- The i-th degeneracy map from [n+1] to [n] -/
-def σ (i : [n]) (a : [n+1]) : [n] :=
+def σ {n} (i : [n]) (a : [n+1]) : [n] :=
 if h : a.val ≤ i.val
 then a.cast_lt (lt_of_le_of_lt h i.is_lt)
 else ⟨a.val.pred,
   (nat.sub_lt_right_iff_lt_add (lt_of_le_of_lt i.val.zero_le (not_le.mp h))).mpr a.is_lt⟩
   --a.pred sorry
 
-lemma δ_monotone (i : [n+1]) : monotone (δ i) :=
+lemma σ_monotone {n} (i : [n]) : monotone (σ i) :=
 λ a b (H : a.val ≤ b.val),
-by dsimp [fin.succ_above]; split_ifs with ha hb; { ext1, simp [nat.succ_eq_add_one], linarith }
-
-lemma σ_monotone (i : [n]) : monotone (σ i) :=
 begin
-  intros a b H,
-  change a.val ≤ b.val at H,
   unfold σ,
   split_ifs with ha hb;
   try { ext1, simp, linarith },
@@ -51,46 +72,12 @@ begin
   { exact nat.pred_le_pred H }
 end
 
-lemma simplicial_identity₁ {i j : [n+1]} (H : i ≤ j) : δ j.succ ∘ δ i = δ i.cast_succ ∘ δ j :=
+lemma simplicial_identity₁ {n} {i j : [n+1]} (H : i ≤ j) : δ i ≫ δ j.succ = δ j ≫ δ i.cast_succ :=
 begin
-  funext a,
-  dsimp [fin.succ_above],
-  by_cases hja : (j.val < a.val),
-  { have hja' : ((fin.succ j).val < (fin.succ a).val) :=
-    begin
-      simp,
-      exact nat.succ_le_succ hja,
-    end,
-    have hia : ((i.cast_succ).val < (fin.succ a).val) :=
-    begin
-      simp,
-      refine (lt_of_le_of_lt H _),
-      exact (nat.le_trans hja (nat.le_succ a.val))
-    end,
-    rw [if_pos hja, if_pos (nat.le_trans H hja), if_pos hja', if_pos hia]},
-  { rw [dif_neg hja],
-    by_cases hia : (i.val ≤ a.val),
-    { have hia' : ((fin.raise i).val ≤ (fin.raise a).val) := hia,
-
-      have hja' : ¬(j.succ.val ≤ a.succ.val) :=
-      begin
-        simp at *,
-        exact nat.succ_le_succ hja
-      end,
-      rw [dif_pos hia, dif_pos hia', dif_neg hja'],
-      simp [fin.raise],
-      apply fin.eq_of_veq,
-      simp},
-    { have hja' : ¬(j.succ.val ≤ a.raise.val) :=
-      begin
-        simp at *,
-        exact nat.le_trans hja (nat.le_succ j.val)
-      end,
-      have hia' : ¬((fin.raise i).val ≤ (fin.raise a).val) :=
-      begin
-        unfold fin.raise, exact hia
-      end,
-      rw [dif_neg hia, dif_neg hja', dif_neg hia']}}
+  change i.val ≤ j.val at H,
+  ext,
+  dsimp [δ, fin.succ_above],
+  split_ifs; { try {ext1}, try {simp [nat.succ_eq_add_one] at *}, try {linarith} },
 end
 
 end simplex_category

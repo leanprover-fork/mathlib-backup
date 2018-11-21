@@ -1,30 +1,42 @@
-import order.basic .simplex_category data.finset data.finsupp algebra.group
+import order.basic algebraic_topology.simplex_category data.finset data.finsupp algebra.group
+import category_theory.opposites category_theory.functor_category
 
-local notation ` [`n`] ` := fin (n+1)
+universes u v w
+
+open category_theory
+
+local notation ` [`n`] ` := simplex_category.from_nat n
+
+variables (C : Type u) [𝒞 : category.{u v} C]
+include 𝒞
+
+def simplicial_object := simplex_categoryᵒᵖ ⥤ C
+
+variable {C}
+
+instance : category (simplicial_object C) := functor.category _ _
+
+omit 𝒞
 
 /-- Simplicial set -/
-class simplicial_set :=
-(objs : Π n : ℕ, Type*)
-(maps {m n : ℕ} {f : [m] → [n]} (hf : monotone f) : objs n → objs m)
-(id {n : ℕ} : (maps (@monotone_id [n] _)) = id)
-(comp {l m n : ℕ} {f : [l] → [m]} {g : [m] → [n]} (hf : monotone f) (hg : monotone g) :
-  (maps hf) ∘ (maps hg) = (maps (monotone_comp hf hg)))
+def simplicial_set := simplicial_object (Type u)
 
-namespace simplicial_set
+namespace simplicial_object
+include 𝒞
 
 /-- The i-th face map of a simplicial set -/
-def δ {X : simplicial_set} {n : ℕ} (i : [n+1]) :=
-maps (simplex_category.δ_monotone i)
+def δ {X : simplicial_object C} {n : ℕ} (i : [n+1]) := X.map (simplex_category.δ i)
 
-lemma simplicial_identity₁ {X : simplicial_set} {n : ℕ} {i j : [n + 1]} (H : i ≤ j) :
-(@δ X n) i ∘ δ j.succ = δ j ∘ δ i.raise := by finish [δ, comp, simplex_category.simplicial_identity₁]
+lemma simplicial_identity₁ {X : simplicial_object C} {n : ℕ} {i j : [n + 1]} (H : i ≤ j) :
+(@δ _ _ X _ j.succ) ≫ δ i = δ i.cast_succ ≫ δ j :=
+by {dsimp [δ], erw [←X.map_comp, simplex_category.simplicial_identity₁, X.map_comp], assumption}
 
-end simplicial_set
+end simplicial_object
 
 namespace simplicial_complex
 noncomputable theory
 local attribute [instance] classical.prop_decidable
-open finset finsupp simplicial_set group
+open finset finsupp simplicial_object group
 
 variables (A : Type*) [module ℤ A] (X : simplicial_set) (n : ℕ)
 -- We actually want to be more general:
@@ -71,7 +83,7 @@ begin
                 sum univ (λ (j : [n+1+1]), sum univ (λ (i : [n+1]),
                   single (((δ i) ∘ (δ j)) x) ((-1 : ℤ) ^ i.val • ((-1 : ℤ) ^ j.val • a)))),
         by unfold function.comp,
-        rw [←@finset.sum_product _ _ _ _ _ _ 
+        rw [←@finset.sum_product _ _ _ _ _ _
                 (λ (p : [n+1+1] × [n+1]),
                   single ((δ p.snd ∘ δ p.fst) x) ((-1 : ℤ)^p.snd.val • ((-1 : ℤ)^p.fst.val • a))),
             ←@finset.sum_sdiff ([n+1+1] × [n+1]) _ (univ.filter (λ p : [n+1+1] × [n+1], p.fst.val ≤ p.snd.val))],
