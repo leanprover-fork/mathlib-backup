@@ -107,7 +107,15 @@ instance : is_linear_map (boundary M X n) :=
   ext1,
   erw [map_range_apply],
   dsimp [boundary],
-  erw [sum_map_range_index _], },
+  erw [sum_map_range_index _], sorry,
+  {
+    intros x,
+    convert finset.sum_const_zero,
+    funext i,
+    convert single_zero,
+    exact gsmul_zero _,
+    repeat {apply_instance},
+  } },
   .. boundary.is_add_group_hom }
 
 end boundary
