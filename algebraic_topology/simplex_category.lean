@@ -6,15 +6,6 @@ import tactic.tidy tactic.linarith tactic.monotonicity
 namespace fin
 variables {n : ℕ}
 
-instance : linear_order (fin n) :=
-{ le               := λ a b, nat.less_than_or_equal a.1 b.1,
-  le_refl          := λ a, @nat.le_refl a.1,
-  le_trans         := λ a b c, @nat.le_trans a.1 b.1 c.1,
-  le_antisymm      := λ a b H1 H2, fin.eq_of_veq $ @nat.le_antisymm a b H1 H2,
-  le_total         := λ a b, @nat.le_total a b,
-  lt               := λ a b, nat.lt a.1 b.1,
-  lt_iff_le_not_le := λ a b, @nat.lt_iff_le_not_le a.1 b.1}
-
 @[extensionality] lemma le_ext {a b : fin n} (h : a.val ≤ b.val) : a ≤ b := h
 
 attribute [extensionality] fin.eq_of_veq
