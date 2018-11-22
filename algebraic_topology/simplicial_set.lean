@@ -1,4 +1,5 @@
 import order.basic algebraic_topology.simplex_category data.finset data.finsupp algebra.group
+import algebra.group_power tactic.abel
 import category_theory.opposites category_theory.functor_category
 
 universes u v w
@@ -33,32 +34,83 @@ by {dsimp [δ], erw [←X.map_comp, simplex_category.simplicial_identity₁, X.m
 
 end simplicial_object
 
+section simplicial_complex
+
+variables (R : Type u) [ring R]
+variables (M : Type u) [add_comm_group M] [module R M]
+variables (X : simplicial_set) (n : ℕ)
+
+/-- The simplicial complex associated with a simplicial set -/
+def simplicial_complex := X.obj [n] →₀ M
+
+end simplicial_complex
+
 namespace simplicial_complex
 noncomputable theory
 local attribute [instance] classical.prop_decidable
 open finset finsupp simplicial_object group
 
-variables (A : Type*) [module ℤ A] (X : simplicial_set) (n : ℕ)
--- We actually want to be more general:
--- variables {R : Type*} [ring R] (A : Type*) [module R A] (X : simplicial_set) (n : ℕ)
--- However, to make this work we need to do some work on modules:
--- - finsupp.to_module needs to be generalised (as suggested in a comment above it)
--- - is_linear_map should be a class so that we can have type class inference
+variables (R : Type u) [ring R]
+variables (M : Type u) [add_comm_group M] [module R M]
+variables (X : simplicial_set) (n : ℕ)
 
-/-- The simplicial complex associated with a simplicial set -/
-def C := (@objs X n) →₀ A
+instance : add_comm_group (simplicial_complex M X n) := finsupp.add_comm_group
+instance : module R (simplicial_complex M X n) := finsupp.to_module _ _
 
-instance : add_comm_group (C A X n) := finsupp.add_comm_group
+definition boundary_component (i : [n+1]) : simplicial_complex M X (n+1) → simplicial_complex M X n :=
+map_domain (@δ _ _ X _ i)
+
+namespace boundary_component
+variables {R} {M} {X} {n}
+
+instance {i : [n+1]} : is_add_group_hom (boundary_component M X n i) :=
+{ add := λ _ _, map_domain_add }
+
+include R
+
+instance {i : [n+1]} : is_linear_map (boundary_component M X n i) :=
+{ smul := λ _ _, map_domain_smul _ _,
+  .. boundary_component.is_add_group_hom }
+
+end boundary_component
 
 /-- The boundary morphism of the simplicial complex -/
-definition boundary : C A X (n+1) → C A X n :=
-λ f, f.sum (λ x a, (sum univ (λ i : [n+1], finsupp.single ((δ i) x) (((-1 : ℤ)^i.val) • a))))
+definition boundary : simplicial_complex M X (n+1) → simplicial_complex M X n :=
+λ s, s.sum $ λ x m, sum univ $ λ i : [n+1], finsupp.single (@δ _ _ X _ i x) $ gsmul ((-1 : ℤ)^i.val) m
 
-instance: is_add_group_hom (boundary A X n) :=
-⟨λ f g,
+namespace boundary
+variables {R} {M} {X} {n}
+
+instance : is_add_group_hom (boundary M X n) :=
+⟨λ s₁ s₂, by apply finsupp.sum_add_index;
+  finish [finset.sum_add_distrib, finset.sum_congr rfl, single_add, gsmul_add] ⟩
+
+include R
+
+@[simp] lemma add_monoid.smul_eq_smul {n : ℕ} {m : M} : add_monoid.smul n m = (n : R) • m :=
 begin
-  apply finsupp.sum_add_index; finish [finset.sum_add_distrib, finset.sum_congr rfl, single_add, smul_add]
-end⟩
+  induction n, simp,
+  calc gsmul (int.of_nat (nat.succ n_n)) m = gsmul (int.of_nat n_n + 1) m : rfl
+    ... = gsmul (int.of_nat n_n) m + gsmul 1 m : add_gsmul _ _ _
+    ... = _ : by simp [*,add_smul],
+end
+
+@[simp] lemma gsmul_eq_smul {n : ℤ} {m : M} : gsmul n m = (n : R) • m :=
+begin
+  induction n, exact add_monoid.smul_eq_smul,
+  simp, rw [add_monoid.smul_eq_smul, add_smul],
+  simp [nat.succ_eq_add_one, add_smul, neg_smul, one_smul]
+end
+
+instance : is_linear_map (boundary M X n) :=
+{ smul := λ r s, by {
+  ext1,
+  erw [map_range_apply],
+  dsimp [boundary],
+  erw [sum_map_range_index _], },
+  .. boundary.is_add_group_hom }
+
+end boundary
 
 lemma C_is_a_complex (γ : C A X (n+2)) : (boundary A X n) ((boundary A X (n+1)) γ) = 0 :=
 begin
