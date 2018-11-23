@@ -13,11 +13,11 @@ variables [add_comm_group N] [module R N]
 variables [add_comm_group P] [module R P]
 variables (f : M →ₗ N) (g : N →ₗ P)
 
-@[simp] lemma lcomp_comp : lcomp P f g = g.comp f := rfl
+lemma lcomp_comp : lcomp P f g = g.comp f := rfl
 
 set_option class.instance_max_depth 100
 include R
-@[simp] lemma llcomp_lcomp : llcomp M N P g f = lcomp P f g := rfl
+lemma llcomp_lcomp : llcomp M N P g f = lcomp P f g := rfl
 
 end linear_map
 
@@ -26,28 +26,29 @@ variables (R : Type u) [comm_ring R]
 def simplicial_module := simplicial_object (RMod R)
 
 namespace simplicial_module
-open linear_map
+open linear_map simplicial_object
 
 variables {R} (X : simplicial_module R)
 
 local notation `[`n`]` := simplex_category.from_nat n
 
 def boundary (n : ℕ) : X.obj [n+1] ⟶ X.obj [n] :=
-sum univ $ λ i : [n+1], gsmul ((-1 : ℤ)^i.val) (X.δ i)
+sum univ $ λ i : [n+1], ((-1 : R)^i.val) • (X.δ i)
+
+-- set_option pp.notation false
 
 lemma boundary_boundary (n : ℕ) : boundary X (n+1) ≫ boundary X n = 0 :=
 begin
+  -- Massage the sums towards the outside
   dsimp [(≫)],
-  erw ← lcomp_comp,
-  erw ← llcomp_lcomp,
-  erw map_sum,
+  erw [← lcomp_comp, ← llcomp_lcomp, map_sum],
   simp only [llcomp_lcomp],
-  simp only [boundary,map_sum],
-  simp,
+  simp [boundary, map_sum],
+  simp [(llcomp_lcomp R _ _ _ _ _).symm],
+  simp [llcomp_lcomp, lcomp_comp, smul_smul],
   -- Gather the sums into a sum over the product of the indexing sets.
   erw ← @finset.sum_product _ _ _ _ _ _
-    (λ (p : [n+1+1] × [n+1]), comp (gsmul ((-1)^p.snd.val) (X.δ p.snd))
-      (gsmul ((-1)^ p.fst.val) (X.δ p.fst))),
+    (λ (p : [n+1+1] × [n+1]), ((-1:R)^p.snd.val * (-1)^p.fst.val) • comp (X.δ p.snd) (X.δ p.fst)),
   -- Split the sum into two parts that will cancel.
   -- Afterwards, move one sum to the other side of the equation,
   -- and move the minus sign into the sum.
@@ -79,7 +80,12 @@ begin
   -- Now we drilled down to the core of the proof.
   -- After all, we have to use the simplicial identity somewhere.
   rintros ⟨i,j⟩ hij,
-  simp,
+  change _ = _ • (_ ≫ _),
+  erw simplicial_identity₁,
+  swap, { exact (mem_filter.mp hij).2 },
+  erw [← neg_one_smul, smul_smul _ _ (comp (δ X j) (δ X i))],
+  congr' 1,
+  simp [nat.succ_eq_add_one, pow_add, mul_comm],
 end
 
 end simplicial_module
