@@ -11,6 +11,48 @@ def pure {X : Type*} (x : X) : (X → nnreal) :=
 
 end nnreal
 
+namespace pmf
+local attribute [instance] classical.prop_decidable
+variables {X : Type*} {Y : Type*} [fintype X] [fintype Y]
+
+lemma metric_pi_topology {π : X → Type*} [∀ x, metric_space (π x)]:
+  (@metric_space_pi _ π _ _).to_uniform_space.to_topological_space = @Pi.topological_space _ π _ :=
+_
+
+def pmf_top : topological_space (pmf X) := subtype.topological_space
+local attribute [instance] pmf_top
+
+lemma map.cont  (f : X → Y) :
+  continuous (pmf.map f) :=
+begin
+  apply continuous_subtype_mk,
+  rw metric_pi_topology,
+  apply continuous_pi,
+  intro y,
+  rw show (λ a : pmf X, ∑ x : X, a x * (pmf.pure ∘ f) x y) =
+    λ (a : pmf X), univ.sum (λ x, a x * (nnreal.pure ∘ f) x y),
+  begin
+    funext x,
+    apply tsum_eq_sum,
+    intros x xni,
+    exfalso,
+    exact xni (mem_univ x)
+  end,
+  apply continuous_finset_sum,
+  intros x hin,
+  rw show (λ (a : pmf X), a x * (nnreal.pure ∘ f) x y) =
+    ((λ (p : nnreal × nnreal), p.fst * p.snd) ∘ (λ a : pmf X, (a x, ite (y = f x) 1 0))),
+  by funext a; simp [function.comp, nnreal.pure],
+  refine continuous.comp (continuous.prod_mk _ _) (@topological_monoid.continuous_mul nnreal _ _ _),
+  { rw show (λ a : pmf X, a x) = (λ a : X → nnreal, a x) ∘ subtype.val, by refl,
+    refine continuous.comp continuous_induced_dom _,
+    rw metric_pi_topology,
+    exact continuous_apply x },
+  { split_ifs; exact continuous_const }
+end
+
+end pmf
+
 local notation ` [`n`] ` := simplex_category.from_nat n
 
 /-- The n-th standard topological simplex: Δ_n = { x ∈ ℝ^{n+1} | ∀ i, x_i ≥ 0, and ∑ x_i = 1 } -/

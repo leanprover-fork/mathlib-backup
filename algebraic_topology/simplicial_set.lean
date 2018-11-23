@@ -1,6 +1,7 @@
 import order.basic algebraic_topology.simplex_category data.finset data.finsupp algebra.group
 import algebra.group_power tactic.abel
 import category_theory.opposites category_theory.functor_category
+import linear_algebra.basic
 
 universes u v w
 
@@ -256,5 +257,18 @@ begin
   repeat {rw ← gsmul_mul},
   rw mul_comm
 end
+
+section lboundary
+open linear_map
+include R
+
+def lboundary := is_linear_map.mk' (boundary M X n) boundary.is_linear_map
+
+lemma lboundary_lboundary : (lboundary R M X n).comp (lboundary R M X (n+1)) = 0 :=
+ext $ λ x, boundary_boundary _ _ _ _
+
+def homology := (lboundary R M X (n+1)).ker
+
+end lboundary
 
 end simplicial_complex
