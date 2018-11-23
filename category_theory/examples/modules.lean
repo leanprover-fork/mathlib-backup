@@ -1,4 +1,4 @@
-import linear_algebra.basic
+import linear_algebra.tensor_product
 import category_theory.functor
 
 open category_theory
@@ -24,7 +24,7 @@ instance RMod_obj.module (M : RMod R) : module R M := M.module
 instance RMod_category : category (RMod R) :=
 { hom := λ M N, M →ₗ N,
   id := λ M, linear_map.id,
-  comp := λ _ _ _ f g, linear_map.comp g f }
+  comp := λ _ _ _ f g, g.comp f }
 
 instance RMod_hom.has_coe_to_fun {M N : RMod R} : has_coe_to_fun (M ⟶ N) :=
 by dunfold RMod_category; apply_instance
