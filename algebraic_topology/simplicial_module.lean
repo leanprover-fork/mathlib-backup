@@ -37,17 +37,11 @@ sum univ $ λ i : [n+1], gsmul ((-1 : ℤ)^i.val) (X.δ i)
 
 lemma boundary_boundary (n : ℕ) : boundary X (n+1) ≫ boundary X n = 0 :=
 begin
-  dsimp [(≫)],
-  erw ← lcomp_comp,
-  erw ← llcomp_lcomp,
-  erw map_sum,
-  simp only [llcomp_lcomp],
-  simp only [boundary,map_sum],
-  simp,
+  dsimp [boundary], simp only [RMod_sum_comp], simp only [RMod_comp_sum],
   -- Gather the sums into a sum over the product of the indexing sets.
   erw ← @finset.sum_product _ _ _ _ _ _
-    (λ (p : [n+1+1] × [n+1]), comp (gsmul ((-1)^p.snd.val) (X.δ p.snd))
-      (gsmul ((-1)^ p.fst.val) (X.δ p.fst))),
+    (λ (p : [n+1+1] × [n+1]),
+      (gsmul ((-1)^ p.fst.val) (X.δ p.fst)) ≫ (gsmul ((-1)^p.snd.val) (X.δ p.snd))),
   -- Split the sum into two parts that will cancel.
   -- Afterwards, move one sum to the other side of the equation,
   -- and move the minus sign into the sum.
@@ -80,6 +74,12 @@ begin
   -- After all, we have to use the simplicial identity somewhere.
   rintros ⟨i,j⟩ hij,
   simp,
+  rw simplicial_object.simplicial_identity₁,
+  dsimp,
+  { conv { to_lhs, rw ←neg_one_gsmul, },
+    rw [←gsmul_mul, ←gsmul_mul', ←gsmul_mul],
+    refl },
+  { simpa using hij }
 end
 
 end simplicial_module
