@@ -1,103 +1,23 @@
 import analysis.normed_space linear_algebra.sesquilinear_form data.complex.basic analysis.metric_space
-
+ 
 open vector_space field set complex real
 
-universes u v w
+set_option class.instance_max_depth 16
 
-class herm_inner_product_space (V : Type u) extends vector_space ℂ V :=
-(inprod : V → V → ℂ) 
-(is_fst_lin : ∀ (a b : ℂ), ∀ (x y z : V), inprod (a • x + b • y) z = a * (inprod x z) + b * (inprod y z))
-(is_conj_sym : ∀ (x y : V), inprod x y = conj (inprod y x))
-(is_pos_def : ∀ (x : V), (inprod x x).re ≥ 0 ∧ ((inprod x x) = 0 ↔ x = 0))
+lemma I_mul_self : I * I = -1 := complex.ext (mul_re I I) (mul_im I I)
 
-local notation a ∘ b := herm_inner_product_space.inprod a b
-  
-open herm_inner_product_space
+lemma smul_two {α : Type*} {β : Type*} [ring β] [module β α] (a : α) :
+a + a = 2 • a := by rw [←one_add_one_eq_two, add_smul, one_smul]
 
-noncomputable instance herm_to_module (V : Type u) [herm_inner_product_space V] : module ℂ V := 
-(herm_inner_product_space.to_vector_space V).to_module
+lemma re_add_mul_I (a b : ℝ) : (↑a + I * ↑b).re = a := 
+by rw [add_re, of_real_re, mul_re, I_re, of_real_im, mul_zero, zero_mul, sub_zero, field.add_zero]
 
-theorem is_anti_linear {V : Type u} [herm_inner_product_space V] : 
-∀ (a b : ℂ), ∀ (x y z : V), x ∘ ((a • y) + (b • z)) = conj(a) * (x ∘ y) + conj(b) * (x ∘ z):=
-begin
-  intros, 
-  rw [is_conj_sym, is_fst_lin, conj_add, conj_mul, ←is_conj_sym, conj_mul, ←is_conj_sym],
-end
+lemma im_add_mul_I (a b : ℝ) : (↑a + I * ↑b).im = b := 
+by rw [add_im , of_real_im, mul_im, I_re, I_im, of_real_re, zero_mul, field.zero_add, field.one_mul, field.zero_add]
 
-@[simp] lemma add_lin_left {V : Type u} [herm_inner_product_space V] (x y z : V) : 
-(x + y) ∘ z = x ∘ z + y ∘ z := 
-begin
-  rw [←module.one_smul x, ←module.one_smul y],
-  rw is_fst_lin,
-  rw [field.one_mul, field.one_mul, one_smul, one_smul],
-end
-
-@[simp] lemma add_lin_right {V : Type u} [herm_inner_product_space V] (x y z : V) : 
-x ∘ (y + z) = x ∘ y + x ∘ z := 
-begin
-  rw [←module.one_smul y, ←module.one_smul z],
-  rw is_anti_linear,
-  rw [conj_one, field.one_mul, field.one_mul, one_smul, one_smul],
-end
-
-@[simp] lemma mul_lin_left {V : Type u} [herm_inner_product_space V] (a : ℂ) (x y : V) :
-(a • x) ∘ y = a * (x ∘ y) :=
-begin
-  rw ←add_zero (a • x),
-  rw ←zero_smul,
-  rw is_fst_lin,
-  rw [zero_mul, field.add_zero],
-  exact 0,
-end
-
-@[simp] lemma mul_antilin_right {V : Type u} [herm_inner_product_space V] (a : ℂ) (x y : V) :
-x ∘ (a • y) = conj(a) * (x ∘ y) :=
-begin
-  rw ←add_zero (a • y),
-  rw ←zero_smul,
-  rw is_anti_linear,
-  rw [conj_zero, zero_mul, field.add_zero],
-  exact 0,
-end
-
-def conj_is_equiv : equiv ℂ ℂ := 
-⟨conj, conj, begin dunfold function.left_inverse, intros, simp, end, begin dunfold function.right_inverse, dunfold function.left_inverse, intros, simp, end⟩
-
-noncomputable def conj_is_isom : ring_isom ℂ ℂ := 
-⟨conj_is_equiv, conj_add, conj_mul, conj_one⟩ 
-
-noncomputable def conj_is_invo : ring_invo ℂ :=
-⟨comm_ring.isom_to_anti_isom conj_is_isom, begin apply conj_conj end⟩ 
-
-noncomputable instance herm_is_sym_sesq (V : Type u) [herm_inner_product_space V] : sym_sesquilinear_form_space ℂ V (conj_is_invo) :=
-{ sesq_form := inprod,
-  fst_add_lin := add_lin_left,
-  fst_mul_lin := by intros; exact mul_lin_left a x y,
-  snd_add_lin := add_lin_right,
-  snd_mul_antilin := mul_antilin_right,
-  is_invo_sym := is_conj_sym}
-
-open sym_sesquilinear_form_space sesquilinear_form_space
-
-@[simp] lemma zero_inprod {V: Type u} [herm_inner_product_space V] (x : V) :
-0 ∘ x = 0 := zero_sesq conj_is_invo x  --by rw [←zero_smul, mul_lin_left, zero_mul]; exact 0
-
-@[simp] lemma inprod_zero {V: Type u} [herm_inner_product_space V] (x : V) :
-x ∘ 0 = 0 := sesq_zero conj_is_invo x --by rw [is_conj_sym, conj_eq_zero, zero_inprod]  
-
-@[simp] lemma inprod_neg_left {V : Type u} [herm_inner_product_space V] (x y : V) : 
--x ∘ y = -(x ∘ y) := sesq_neg_left conj_is_invo x y --by rw [←neg_one_smul, mul_lin_left, neg_one_mul]
-
-@[simp] lemma inprod_neg_right {V : Type u} [herm_inner_product_space V] (x y : V) : 
-x ∘ -y = -(x ∘ y) := sesq_neg_right conj_is_invo x y --by rw [←neg_one_smul, mul_antilin_right, conj_neg, conj_one, neg_one_mul]   
-
-noncomputable instance complex.add_comm_group : add_comm_group ℂ := ring.to_add_comm_group ℂ  
-
-lemma inprod_sub_left {V : Type u} [herm_inner_product_space V] (x y z : V) : 
-(x - y) ∘ z = (x ∘ z) - (y ∘ z) := by rw [sub_eq_add_neg, add_lin_left, inprod_neg_left]; refl
-
-lemma inprod_sub_right {V : Type u} [herm_inner_product_space V] (x y z : V) : 
-x ∘ (y - z) = (x ∘ y) - (x ∘ z) := by rw [sub_eq_add_neg, add_lin_right, inprod_neg_right]; refl
+lemma ne_comm {α : Type*} {a b : α} : a ≠ b ↔ b ≠ a :=
+⟨ λ H, iff_subst (@eq_comm _ a b) H, 
+  λ H, iff_subst (@eq_comm _ b a) H⟩ 
 
 lemma conj_eq_real (x : ℂ) : x.im = 0 ↔ conj(x) = x :=
 begin
@@ -146,77 +66,115 @@ begin
   rw Hd,
 end
 
-lemma I_mul_self : I * I = -1 := complex.ext (mul_re I I) (mul_im I I)
+def conj.equiv : equiv ℂ ℂ := 
+⟨conj, conj, begin dunfold function.left_inverse, intros, simp, end, begin dunfold function.right_inverse, dunfold function.left_inverse, intros, simp, end⟩
 
-lemma zero_pow {α : Type u} [ring α] (n : ℕ) (ha : n ≠ 0) : (0 : α)^n = (0 : α) :=
+noncomputable def conj.ring_isom : ring_isom ℂ ℂ := 
+⟨conj.equiv, conj_one, conj_mul, conj_add⟩ 
+
+noncomputable def conj.ring_invo : ring_invo ℂ :=
+⟨comm_ring.isom_to_anti_isom conj.ring_isom, begin apply conj_conj end⟩
+
+class herm_inner_product_space (α : Type*) extends sym_sesquilinear_form_space ℂ α conj.ring_invo :=
+(sesq_self_re_nonneg : ∀ (x : α), (sesq_form x x).re ≥ 0)
+(sesq_self_eq_zero_iff : ∀ (x : α), sesq_form x x = 0 ↔ x = 0)
+
+namespace herm_inner_product_space
+
+variables {α : Type*} [herm_inner_product_space α]
+
+open herm_inner_product_space ring_invo
+
+noncomputable def inprod : α → α → ℂ := (to_sym_sesquilinear_form_space α).sesq_form  
+
+local notation a ∘ b := inprod a b
+
+noncomputable instance herm_to_module : module ℂ α := 
+(herm_inner_product_space.to_sym_sesquilinear_form_space α).to_sesquilinear_form_space.to_module
+
+lemma conj_inprod (x y : α) : conj (x ∘ y) = y ∘ x := sym_sesquilinear_form_space.map_sesq conj.ring_invo y x 
+
+lemma inprod_self_re_nonneg (x : α) : (x ∘ x).re ≥ 0 := sesq_self_re_nonneg x   
+
+lemma inprod_self_eq_zero (x : α) : (inprod x x) = 0 ↔ x = (0 : α) := sesq_self_eq_zero_iff x
+
+@[simp] lemma inprod_add_left (x y z : α) : 
+(x + y) ∘ z = x ∘ z + y ∘ z := sesquilinear_form_space.fst_add_lin _ _ _ _
+
+@[simp] lemma inprod_add_right (x y z : α) : 
+x ∘ (y + z) = x ∘ y + x ∘ z := sesquilinear_form_space.snd_add_lin _ _ _ _
+
+@[simp] lemma inprod_smul_left (a : ℂ) (x y : α) :
+(a • x) ∘ y = a * (x ∘ y) := sesquilinear_form_space.fst_mul_lin _ _ _ _
+
+@[simp] lemma inprod_smul_right (a : ℂ) (x y : α) :
+x ∘ (a • y) = conj(a) * (x ∘ y) := sesquilinear_form_space.snd_mul_antilin _ _ _ _
+
+/-
+lemma inprod_smul_add_smul_left : ∀ (a b : ℂ), ∀ (x y z : α), (a • x + b • y) ∘ z = a * (x ∘ z) + b * (y ∘ z) := sorry
+
+theorem inprod_smul_add_smul_right : 
+∀ (a b : ℂ), ∀ (x y z : α), x ∘ ((a • y) + (b • z)) = conj(a) * (x ∘ y) + conj(b) * (x ∘ z):=
 begin
-  induction n with d Hd,
-    trivial,
-  rw nat.succ_eq_add_one,
-  rw pow_succ,
-  simp,
+  intros, 
+  rw [←conj_inprod, inprod_smul_add_smul_left, conj_add, conj_mul, conj_inprod, conj_mul, conj_inprod],
 end
+-/
 
-lemma smul_two {α : Type u} {β : Type v} [ring β] [module β α] (a : α) :
-a + a = 2 • a := by rw [←one_add_one_eq_two, add_smul, one_smul]
+open sym_sesquilinear_form_space sesquilinear_form_space
 
-lemma re_add_mul_I (a b : ℝ) : (↑a + I * ↑b).re = a := by simp
+@[simp] lemma zero_inprod (x : α) :
+0 ∘ x = 0 := zero_sesq _ x  
 
-lemma im_add_mul_I (a b : ℝ) : (↑a + I * ↑b).im = b := by simp
+@[simp] lemma inprod_zero (x : α) :
+x ∘ 0 = 0 := sesq_zero _ x 
 
-lemma ne_comm {α : Type u} {a b : α} : a ≠ b ↔ b ≠ a :=
-⟨ λ H, iff_subst (@eq_comm _ a b) H, λ H, 
-  iff_subst (@eq_comm _ b a) H⟩ 
+@[simp] lemma inprod_neg_left (x y : α) : 
+-x ∘ y = -(x ∘ y) := sesq_neg_left _ x y 
 
-lemma pow_eq_zero {α : Type u} [field α] {a : α} {n : ℕ} : a^n = 0 → a = 0 :=
-begin
-  intros H,
-  induction n with d Hd,
-    rw pow_zero at H,
-    suffices : false,
-      trivial,
-    exact field.zero_ne_one α (eq_comm.mp H),
-  dunfold has_pow.pow at H,
-  dunfold monoid.pow at H,
-  rw mul_eq_zero at H,
-  cases H,
-    exact H,
+@[simp] lemma inprod_neg_right (x y : α) : 
+x ∘ -y = -(x ∘ y) := sesq_neg_right _ x y   
 
-    exact Hd H,
-end
+noncomputable instance complex.add_comm_group : add_comm_group ℂ := ring.to_add_comm_group ℂ  
 
-theorem inprod_self_real {V : Type u} [herm_inner_product_space V] (x : V) :
+lemma inprod_sub_left (x y z : α) : 
+(x - y) ∘ z = (x ∘ z) - (y ∘ z) := sesq_sub_left conj.ring_invo x y z
+
+lemma inprod_sub_right (x y z : α) : 
+x ∘ (y - z) = (x ∘ y) - (x ∘ z) := sesq_sub_right conj.ring_invo x y z
+
+theorem inprod_self_im (x : α) :
 (x ∘ x).im = 0 := 
 begin
   intros,
   have H : conj(x ∘ x) = x ∘ x,
-    rw ←is_conj_sym,
+    rw conj_inprod,
   rw conj_eq_real (x ∘ x),
   exact H, 
 end
 
-lemma inprod_self_re_eq_zero {V : Type u} [herm_inner_product_space V] (x : V) : 
+lemma inprod_self_re_eq_zero (x : α) : 
 (x ∘ x).re = 0 ↔ x = 0 := 
 begin
   split; intros H,
     suffices : x ∘ x = 0,
-      exact (is_pos_def x).right.mp this,
+      exact (inprod_self_eq_zero x).mp this,
     apply complex.ext,
       simpa,
 
-      rw inprod_self_real,
+      rw inprod_self_im,
       rw zero_im,
 
     rw H,
     simp,
 end
 
-lemma inprod_self_ne_zero_iff {V : Type u} [herm_inner_product_space V] {x : V} : 
+lemma inprod_self_ne_zero_iff {x : α} : 
 (x ∘ x) ≠ 0 ↔ x ≠ 0 :=
-⟨ λ H, (iff_false_left H).mp (is_pos_def x).right, 
-  λ H, (iff_false_right H).mp (is_pos_def x).right⟩ 
+⟨ λ H, (iff_false_left H).mp (inprod_self_eq_zero x), 
+  λ H, (iff_false_right H).mp (inprod_self_eq_zero x)⟩ 
 
-lemma inprod_self_re_ne_zero_iff {V : Type u} [herm_inner_product_space V] {x : V} : 
+lemma inprod_self_re_ne_zero_iff {x : α} : 
 (x ∘ x).re ≠ 0 ↔ x ≠ 0 :=
 begin
   split; intros H,
@@ -229,26 +187,34 @@ begin
 
     have Ho : (x ∘ x) ≠ 0,
       exact inprod_self_ne_zero_iff.mpr H,
-    exact ne_zero_im_zero_imp_re_ne_zero Ho (inprod_self_real x), 
+    exact ne_zero_im_zero_imp_re_ne_zero Ho (inprod_self_im x), 
 end
 
-noncomputable def herm_norm {V: Type u} [herm_inner_product_space V] (x : V) := sqrt((x ∘ x).re)
+lemma inprod_re (x y : α) : (x ∘ y).re = (y ∘ x).re := 
+by rw [←conj_inprod, conj_re]
+
+lemma inprod_im (x y : α) : (x ∘ y).im = -(y ∘ x).im :=
+by rw [←conj_inprod, conj_im]
+
+noncomputable def herm_norm (x : α) := sqrt((x ∘ x).re)
 
 local notation |a|  := herm_norm(a) 
 
-lemma mul_self_herm_norm {V : Type u} [herm_inner_product_space V] (x : V) : 
+lemma mul_self_herm_norm (x : α) : 
 |x| * |x| = (x ∘ x).re :=
 begin
   dunfold herm_norm,
-  rw mul_self_sqrt (is_pos_def x).left,
+  rw mul_self_sqrt (inprod_self_re_nonneg x),
 end --change uses of mul_self_sqrt to this
 
-lemma herm_norm_sqr {V : Type u} [herm_inner_product_space V] (x : V) : 
+lemma herm_norm_sqr (x : α) : 
 |x|^2 = (x ∘ x).re := by rw pow_two; exact mul_self_herm_norm x
 
 open classical
 
-theorem cauchy_schwarz_innequality {V : Type u} [herm_inner_product_space V] (x y : V) :
+--set_option pp.all true
+
+theorem abs_inprod_le_mul_herm_norm (x y : α) :
 abs((x ∘ y)) ≤ |x|*|y| := 
 begin
   intros,
@@ -264,24 +230,24 @@ begin
       apply mul_nonneg (sqrt_nonneg (((x - (x ∘ y / ↑(sqrt ((y ∘ y).re) * sqrt ((y ∘ y).re))) • y) ∘ (x - (x ∘ y / ↑(sqrt ((y ∘ y).re) * sqrt ((y ∘ y).re))) • y)).re)) (sqrt_nonneg (((x - (x ∘ y / ↑(sqrt ((y ∘ y).re) * sqrt ((y ∘ y).re))) • y) ∘ (x - (x ∘ y / ↑(sqrt ((y ∘ y).re) * sqrt ((y ∘ y).re))) • y)).re)), 
     rw sub_eq_add_neg at H,
     rw of_real_mul at H,
-    dunfold herm_norm at H,
-    rw mul_self_sqrt (is_pos_def ((x + -((x ∘ y / (↑(sqrt ((y ∘ y).re)) * ↑(sqrt ((y ∘ y).re)))) • y)))).left at H, 
+    unfold herm_norm at H,
+    rw mul_self_sqrt (inprod_self_re_nonneg ((x + -((x ∘ y / (↑(sqrt ((y ∘ y).re)) * ↑(sqrt ((y ∘ y).re)))) • y)))) at H, 
     rw ←of_real_mul at H,
-    rw of_real_inj.mpr (mul_self_sqrt (is_pos_def y).left) at H, 
+    rw of_real_inj.mpr (mul_self_sqrt (inprod_self_re_nonneg y)) at H, 
     suffices H : 0 ≤ (x ∘ x).re + ((x ∘ -((x ∘ y / ↑((y ∘ y).re)) • y)).re + ((x ∘ -((x ∘ y / ↑((y ∘ y).re)) • y)).re + (-((x ∘ y / ↑((y ∘ y).re)) • y) ∘ -((x ∘ y / ↑((y ∘ y).re)) • y)).re)),
       have he : (-((x ∘ y / ↑((y ∘ y).re)) • y) ∘ -((x ∘ y / ↑((y ∘ y).re)) • y)).re = -(x ∘ -((x ∘ y / ↑((y ∘ y).re)) • y)).re,
         rw inprod_neg_right,
         rw inprod_neg_right,
         rw inprod_neg_left,
-        rw mul_lin_left,
-        rw mul_antilin_right,
-        rw mul_antilin_right,
+        rw inprod_smul_left,
+        rw inprod_smul_right,
+        rw inprod_smul_right,
         have hr : y ∘ y = ↑((y ∘ y).re),
-          rw re_of_real (inprod_self_real y),
+          rw re_of_real (inprod_self_im y),
         rw conj_div,
         rw conj_of_real,
         rw ←hr,
-        rw div_mul_cancel (conj(x ∘ y)) ((iff_false_right ho).mp (is_pos_def y).right),
+        rw div_mul_cancel (conj(x ∘ y)) ((iff_false_right ho).mp (inprod_self_eq_zero y)),
         rw div_mul_eq_mul_div,
         rw div_mul_eq_mul_div,
         rw field.mul_comm,
@@ -290,13 +256,13 @@ begin
       rw add_neg_self at H,
       rw field.add_zero at H,
       rw inprod_neg_right at H,
-      rw mul_antilin_right at H,
+      rw inprod_smul_right at H,
       rw conj_div at H,
       rw conj_of_real at H,
       dunfold herm_norm,
       dunfold complex.abs, 
-      rw ←sqrt_mul (is_pos_def x).left,
-      rw sqrt_le (norm_sq_nonneg (x ∘ y)) (mul_nonneg (is_pos_def x).left (is_pos_def y).left), 
+      rw ←sqrt_mul (inprod_self_re_nonneg x),
+      rw sqrt_le (norm_sq_nonneg (x ∘ y)) (mul_nonneg (inprod_self_re_nonneg x) (inprod_self_re_nonneg y)), 
       rw ←sub_le_iff_le_add' at H,
       rw sub_eq_neg_add at H,
       rw field.add_zero at H,
@@ -307,33 +273,34 @@ begin
       rw mul_conj at H,
       rw ←of_real_div at H,
       rw of_real_re at H,
-      rw div_le_iff (lt_of_le_of_ne (is_pos_def y).left ((ne_comm).mp (ne_zero_im_zero_imp_re_ne_zero  (inprod_self_ne_zero_iff.mpr ho) (inprod_self_real y)))) at H,
+      rw div_le_iff (lt_of_le_of_ne (inprod_self_re_nonneg y) ((ne_comm).mp (ne_zero_im_zero_imp_re_ne_zero  (inprod_self_ne_zero_iff.mpr ho) (inprod_self_im y)))) at H,
       exact H,
-    rw add_lin_left at H,
-    rw add_lin_right at H,
-    rw add_lin_right at H,
+    rw inprod_add_left at H,
+    rw inprod_add_right at H,
+    rw inprod_add_right at H,
     rw add_re at H,
     rw add_re at H,
-    rw is_conj_sym (-((x ∘ y / ↑((y ∘ y).re)) • y)) x at H,
-    ring at H,
+    rw add_re at H,
+    rw inprod_re (-((x ∘ y / ↑((y ∘ y).re)) • y)) x at H,
+    rw field.add_assoc at H,
     exact H,
 end
 
-def herm_norm_eq_zero_iff {V : Type u} [herm_inner_product_space V] (x : V) :
+def herm_norm_eq_zero_iff (x : α) :
 |x| = 0 ↔ x = 0 := 
 begin
   dunfold herm_norm,
-  rw sqrt_eq_zero (is_pos_def x).left,
+  rw sqrt_eq_zero (inprod_self_re_nonneg x),
   exact (inprod_self_re_eq_zero x),
 end
 
-theorem cauchy_schwarz_eq_zero_iff {V : Type u} [herm_inner_product_space V] (x y : V) : 
+theorem abs_inprod_eq_mul_herm_norm_iff (x y : α) : 
 abs(x ∘ y) = |x|*|y| ↔ (∃ (a : ℂ), x = a • y) ∨ (∃ (a : ℂ), y = a • x) :=
 begin
   dunfold herm_norm,
   dunfold complex.abs,
-  rw ←sqrt_mul (is_pos_def x).left,
-  rw sqrt_inj (norm_sq_nonneg _) (mul_nonneg (is_pos_def x).left (is_pos_def y).left),
+  rw ←sqrt_mul (inprod_self_re_nonneg x),
+  rw sqrt_inj (norm_sq_nonneg _) (mul_nonneg (inprod_self_re_nonneg x) (inprod_self_re_nonneg y)),
     
   split; intros H,
     have ho : y = 0 ∨ y ≠ 0,
@@ -348,49 +315,50 @@ begin
         have Ht : |x - ((x ∘ y)/(↑( |y|*|y| ))) • y| = 0,
           exact eq_zero_of_mul_self_eq_zero this,
         rw herm_norm_eq_zero_iff at Ht,
-        dunfold herm_norm at Ht,
+        unfold herm_norm at Ht,
         rw sub_eq_zero at Ht,
         exact or.intro_left _ (exists.intro (x ∘ y / ↑(sqrt ((y ∘ y).re) * sqrt ((y ∘ y).re))) Ht),
       have He : |x - ((x ∘ y)/(↑( |y|*|y| ))) • y| * |x - ((x ∘ y)/(↑( |y|*|y| ))) • y| = |x|*|x| - (abs(x ∘ y)^2)/ ( |y|*|y| ),
         rw sub_eq_add_neg,
         rw of_real_mul,
         dunfold herm_norm,
-        rw mul_self_sqrt (is_pos_def ((x + -((x ∘ y / (↑(sqrt ((y ∘ y).re)) * ↑(sqrt ((y ∘ y).re)))) • y)))).left, 
+        rw mul_self_sqrt (inprod_self_re_nonneg ((x + -((x ∘ y / (↑(sqrt ((y ∘ y).re)) * ↑(sqrt ((y ∘ y).re)))) • y)))), 
         rw ←of_real_mul,
-        rw of_real_inj.mpr (mul_self_sqrt (is_pos_def y).left),
-        repeat {rw add_lin_left <|> rw add_lin_right <|> rw mul_lin_left <|> rw mul_antilin_right},
+        rw of_real_inj.mpr (mul_self_sqrt (inprod_self_re_nonneg y)),
+        repeat {rw inprod_add_left <|> rw inprod_add_right <|> rw inprod_smul_left <|> rw inprod_smul_right},
         rw add_re,
         rw add_re,
-        rw is_conj_sym (-((x ∘ y / ↑((y ∘ y).re)) • y)) x,
-        rw mul_self_sqrt (is_pos_def x).left,
-        rw mul_self_sqrt (is_pos_def y).left,
+        rw ←conj_inprod x (-((x ∘ y / ↑((y ∘ y).re)) • y)),
+        rw mul_self_sqrt (inprod_self_re_nonneg x),
+        rw mul_self_sqrt (inprod_self_re_nonneg y),
         rw pow_two,
         rw mul_self_abs,
         have he : (-((x ∘ y / ↑((y ∘ y).re)) • y) ∘ -((x ∘ y / ↑((y ∘ y).re)) • y)).re = -(x ∘ -((x ∘ y / ↑((y ∘ y).re)) • y)).re,
           rw inprod_neg_right,
           rw inprod_neg_right,
           rw inprod_neg_left,
-          rw mul_lin_left,
-          rw mul_antilin_right,
-          rw mul_antilin_right,
+          rw inprod_smul_left,
+          rw inprod_smul_right,
+          rw inprod_smul_right,
           have hr : y ∘ y = ↑((y ∘ y).re),
-            rw re_of_real (inprod_self_real y),
+            rw re_of_real (inprod_self_im y),
           rw conj_div,
           rw conj_of_real,
           rw ←hr,
-          rw div_mul_cancel (conj(x ∘ y)) ((iff_false_right ho).mp (is_pos_def y).right),
+          rw div_mul_cancel (conj(x ∘ y)) ((iff_false_right ho).mp (inprod_self_eq_zero y)),
           rw div_mul_eq_mul_div,
           rw div_mul_eq_mul_div,
           rw field.mul_comm,
           refl,
         rw add_re, 
         rw he,
-        rw re_of_real (inprod_self_real y),
+        rw re_of_real (inprod_self_im y),
         rw conj_re,
+        rw field.add_assoc,
         rw add_neg_self,
         rw field.add_zero,
         rw ←neg_smul,
-        rw mul_antilin_right,
+        rw inprod_smul_right,
         rw mul_re,
         rw conj_re,
         rw conj_im,
@@ -405,7 +373,7 @@ begin
         rw mul_im,
         rw inv_re,
         rw inv_im,
-        rw inprod_self_real,
+        rw inprod_self_im,
         rw neg_zero,
         rw zero_div,
         rw zero_mul,
@@ -416,7 +384,7 @@ begin
         rw field.mul_assoc,
         rw ←field.left_distrib,
         dunfold norm_sq,
-        rw inprod_self_real,
+        rw inprod_self_im,
         rw mul_zero,
         rw field.add_zero,
         rw ←mul_div_right_comm,
@@ -437,51 +405,48 @@ begin
     dunfold complex.norm_sq,    
     cases H; cases H with a Ha; 
     rw Ha;
-    repeat {rw mul_lin_left};
-    rw mul_antilin_right;
+    repeat {rw inprod_smul_left};
+    rw inprod_smul_right;
     repeat {rw mul_re};
     repeat {rw mul_im};
     rw conj_im;
     rw conj_re;
-    rw inprod_self_real;
+    rw inprod_self_im;
     ring,
 end
 
-noncomputable def herm_dist {V : Type u} [herm_inner_product_space V] (x y : V) : ℝ := |x - y|
+noncomputable def herm_dist (x y : α) : ℝ := |x - y|
 
 open metric_space
 
-noncomputable instance herm_inner_product_space.to_metric_space (V : Type u) [herm_inner_product_space V] : 
-metric_space V := 
-{ dist := herm_dist, 
+noncomputable instance to_metric_space : 
+metric_space α := 
+{ dist := λ x y, |x - y|, 
   dist_self := 
     begin
       intros,
       unfold dist, 
-      dunfold herm_dist,
-      dunfold herm_norm,
-      simp,
+      rw sub_self,
+      rw herm_norm_eq_zero_iff,
     end,
   eq_of_dist_eq_zero :=
     begin
       unfold dist,
-      dunfold herm_dist,
       dunfold herm_norm,
       intros x y H,
-      rw sqrt_eq_zero (is_pos_def (x - y)).left at H,
+      rw sqrt_eq_zero (inprod_self_re_nonneg (x - y)) at H,
       rw ←zero_re at H,
       have H1 : (x - y) ∘ (x - y) = 0,
-        exact complex.ext H (inprod_self_real (x - y)),
-      rw (is_pos_def (x - y)).right at H1,
+        exact complex.ext H (inprod_self_im (x - y)),
+      rw inprod_self_eq_zero (x - y) at H1,
       exact sub_eq_zero.mp H1,
     end,
   dist_comm := 
     begin
       intros,
-      unfold dist,
-      dunfold herm_dist, 
+      unfold dist, 
       dunfold herm_norm,
-      rw sqrt_inj (is_pos_def (x - y)).left (is_pos_def (y - x)).left,
+      rw sqrt_inj (inprod_self_re_nonneg (x - y)) (inprod_self_re_nonneg (y - x)),
       rw ←neg_sub,
       rw inprod_neg_left,
       rw inprod_neg_right,
@@ -490,8 +455,7 @@ metric_space V :=
   dist_triangle := 
     begin 
       unfold dist,
-      dunfold herm_dist,
-      suffices : ∀ (x y : V), |x + y| ≤ |x| + |y|,
+      suffices : ∀ (x y : α), |x + y| ≤ |x| + |y|,
       intros,
       have H : x - z = (x - y) + (y - z),
         simp,
@@ -501,11 +465,11 @@ metric_space V :=
       intros,
       have H : |x + y|*|x + y| = ((x + y) ∘ (x + y)).re,
         dunfold herm_norm,
-        rw mul_self_sqrt (is_pos_def (x + y)).left,
-      rw add_lin_left at H,
-      rw add_lin_right at H,
-      rw add_lin_right at H,
-      rw is_conj_sym y at H,
+        rw mul_self_sqrt (inprod_self_re_nonneg (x + y)),
+      rw inprod_add_left at H,
+      rw inprod_add_right at H,
+      rw inprod_add_right at H,
+      rw ←conj_inprod x y at H,
       rw field.add_assoc at H,
       rw ←field.add_assoc (x ∘ y) at H,
       rw add_conj at H,
@@ -519,13 +483,13 @@ metric_space V :=
       suffices Hle :  |x + y| * |x + y| ≤ (x ∘ x).re + (y ∘ y).re + 2 * abs (x ∘ y),
         have Hcs : 2*abs(x ∘ y) ≤ 2*|x|*|y|,
           rw field.mul_assoc,
-          exact (mul_le_mul_left (lt_trans zero_lt_one (begin exact two_gt_one, end))).mpr (cauchy_schwarz_innequality x y),
+          exact (mul_le_mul_left (lt_trans zero_lt_one (begin exact two_gt_one, end))).mpr (abs_inprod_le_mul_herm_norm x y),
         have hz : 2*abs(x ∘ y) ≥ 0,
           rw two_mul,
           have ha : abs(x ∘ y) ≥ 0,
             exact abs_nonneg (x ∘ y),
           exact le_add_of_le_of_nonneg ha ha,
-        dunfold herm_norm at Hcs,
+        unfold herm_norm at Hcs,
         rw ←sub_zero (2 * sqrt ((x ∘ x).re) * sqrt ((y ∘ y).re)) at Hcs,
         rw le_sub at Hcs,
         have Hs : |x + y|*|x + y| ≤ 2 * sqrt ((x ∘ x).re) * sqrt ((y ∘ y).re) - 2 * abs (x ∘ y) + ((x ∘ x).re + (y ∘ y).re + 2 * abs (x ∘ y)),
@@ -544,10 +508,10 @@ metric_space V :=
           rw field.right_distrib,
           rw field.left_distrib,
           rw field.left_distrib,
-          rw ←sqrt_mul ((is_pos_def x).left), 
-          rw sqrt_mul_self ((is_pos_def x).left),
+          rw ←sqrt_mul ((inprod_self_re_nonneg x)), 
+          rw sqrt_mul_self ((inprod_self_re_nonneg x)),
           rw ←pow_two,
-          rw sqr_sqrt (is_pos_def y).left,
+          rw sqr_sqrt (inprod_self_re_nonneg y),
           ring,  
         rw He at Hs',
         apply (mul_self_le_mul_self_iff (begin intros, exact sqrt_nonneg (((x + y) ∘ (x + y)).re), end) (add_nonneg (begin intros, exact sqrt_nonneg ((x ∘ x).re), end) (begin intros, exact sqrt_nonneg ((y ∘ y).re), end))).mpr Hs',    
@@ -557,13 +521,13 @@ metric_space V :=
       apply add_le_add (le_of_eq H) hle,
     end}
 
-@[simp] lemma herm_norm_smul {V : Type u} [herm_inner_product_space V] (a : ℂ) (x : V) : 
+@[simp] lemma herm_norm_smul (a : ℂ) (x : α) : 
 |a • x| = abs(a)*|x| := 
 begin 
   intros, 
   dunfold herm_norm, 
-  rw mul_lin_left,
-  rw mul_antilin_right,
+  rw inprod_smul_left,
+  rw inprod_smul_right,
   rw ←field.mul_assoc,
   rw mul_conj,
   rw mul_re,
@@ -576,52 +540,44 @@ begin
   exact norm_sq_nonneg a, 
 end
 
-@[simp] lemma of_real_herm_norm_sqr {V : Type u} [herm_inner_product_space V] (x : V) : 
+@[simp] lemma of_real_herm_norm_sqr (x : α) : 
 ↑( |x|^2 ) = x ∘ x :=
 begin
   dunfold herm_norm,
-  rw sqr_sqrt (is_pos_def x).left,
-  rw re_of_real (inprod_self_real x),
+  rw sqr_sqrt (inprod_self_re_nonneg x),
+  rw re_of_real (inprod_self_im x),
 end
 
-@[simp] lemma of_real_herm_norm_mul_self {V : Type u} [herm_inner_product_space V] (x : V) : 
+@[simp] lemma of_real_herm_norm_mul_self (x : α) : 
 ↑( |x|*|x| ) = x ∘ x :=
 begin
   dunfold herm_norm,
-  rw mul_self_sqrt (is_pos_def x).left,
-  rw re_of_real (inprod_self_real x),
+  rw mul_self_sqrt (inprod_self_re_nonneg x),
+  rw re_of_real (inprod_self_im x),
 end
 
-noncomputable instance complex.to_metric_space : metric_space ℂ :=
+noncomputable instance complex.metric_space : metric_space ℂ :=
 { dist := λ x y, abs(x - y),
   dist_self := by simp,
   eq_of_dist_eq_zero := assume x y H, sub_eq_zero.mp (complex.abs_eq_zero.mp H),
   dist_comm := begin intros, unfold dist, rw ←neg_sub, rw complex.abs_neg, end,
   dist_triangle := abs_sub_le}
 
-noncomputable instance complex.to_normed_field : normed_field ℂ :=
+noncomputable instance complex.normed_field : normed_field ℂ :=
 { norm := abs,
   dist_eq := by intros; refl, 
   norm_mul := abs_mul,}
 
-noncomputable instance herm_inner_product_space.to_normed_space {V : Type u} [herm_inner_product_space V] : 
-normed_space ℂ V := 
+noncomputable instance herm_inner_product_space.normed_space : 
+normed_space ℂ α := 
 { norm := herm_norm,
   dist_eq := by intros; refl,
   norm_smul := herm_norm_smul}
 
-instance normed_space.to_module {W : Type v} {F : Type u} [normed_field F] [normed_space F W] : module F W := (normed_space.to_vector_space W).to_module
+instance normed_space.module {W : Type*} {F : Type*} [normed_field F] [normed_space F W] : module F W := (normed_space.to_vector_space W).to_module
 
-@[simp] lemma herm_norm_zero {V : Type u} [herm_inner_product_space V] : 
-|(0 : V)| = 0 := @norm_zero V _
-
-@[simp] lemma herm_norm_smul_I {V : Type u} [herm_inner_product_space V] (x : V) :
-|I • x| = |x| := by simp
-
-lemma norm_ne_zero_iff_ne_zero {G : Type*} [normed_group G] {g : G} : 
-∥g∥ ≠ 0 ↔ g ≠ 0 := 
-⟨ λ H, (iff_false_left H).mp (norm_eq_zero g), 
-  λ H, (iff_false_right H).mp (norm_eq_zero g)⟩ 
+@[simp] lemma herm_norm_zero : 
+|(0 : α)| = 0 := @norm_zero α _
 
 lemma norm_smul_I {W : Type*} [normed_space ℂ W] (x : W) :
 ∥I • x∥ = ∥x∥ :=
@@ -632,18 +588,26 @@ begin
   rw field.one_mul, 
 end
 
-theorem parallelogram_law {V : Type u} [herm_inner_product_space V] (x y : V) :
+@[simp] lemma herm_norm_smul_I (x : α) :
+|I • x| = |x| := norm_smul_I x 
+
+lemma norm_ne_zero_iff_ne_zero {G : Type*} [normed_group G] {g : G} : 
+∥g∥ ≠ 0 ↔ g ≠ 0 := 
+⟨ λ H, (iff_false_left H).mp (norm_eq_zero g), 
+  λ H, (iff_false_right H).mp (norm_eq_zero g)⟩ 
+
+theorem parallelogram_law (x y : α) :
 |x + y|^2 + |x - y|^2 = 2*|x|^2 + 2*|y|^2 :=
 begin
   dunfold herm_norm,
-  rw sqr_sqrt (is_pos_def (x + y)).left,
-  rw sqr_sqrt (is_pos_def (x - y)).left,
-  rw sqr_sqrt (is_pos_def x).left,
-  rw sqr_sqrt (is_pos_def y).left,
+  rw sqr_sqrt (inprod_self_re_nonneg (x + y)),
+  rw sqr_sqrt (inprod_self_re_nonneg (x - y)),
+  rw sqr_sqrt (inprod_self_re_nonneg x),
+  rw sqr_sqrt (inprod_self_re_nonneg y),
   suffices : (x ∘ x).re + ((x ∘ x).re + ((y ∘ y).re + (y ∘ y).re)) = 2 * (x ∘ x).re + 2 * (y ∘ y).re,
-    rw add_lin_left,
-    rw add_lin_right,
-    rw add_lin_right,
+    rw inprod_add_left,
+    rw inprod_add_right,
+    rw inprod_add_right,
     rw inprod_sub_left,
     rw inprod_sub_right,
     rw inprod_sub_right,
@@ -653,32 +617,32 @@ begin
     rw sub_re,
     rw sub_re,
     simpa,
-  rw is_conj_sym y,
+  rw ←conj_inprod y,
   rw conj_re,
   ring,
 end
 
-lemma inprod_self_add {V : Type u} [herm_inner_product_space V] (x y : V) :
+lemma inprod_self_add (x y : α) :
 (x + y) ∘ (x + y) = (x ∘ x) + (y ∘ y) + (x ∘ y) + (y ∘ x) :=
 begin
-  rw add_lin_left,
-  rw add_lin_right,
-  rw add_lin_right,
+  rw inprod_add_left,
+  rw inprod_add_right,
+  rw inprod_add_right,
   simpa [field.add_assoc, field.add_comm],
 end
 
-def is_normalised {V : Type u} [herm_inner_product_space V] (x : V) := |x| = 1
+def is_normalised (x : α) := |x| = 1
 
-noncomputable def normalise {V : Type u} [herm_inner_product_space V] (x : V) := ↑|x|⁻¹ • x 
+noncomputable def normalise (x : α) := ↑|x|⁻¹ • x 
 
-lemma normalise_normalises {V : Type u} [herm_inner_product_space V] (x : V) (ho : x ≠ 0) : 
+lemma normalise_normalises (x : α) (ho : x ≠ 0) : 
 is_normalised (normalise x) :=
 begin
   dunfold is_normalised,
   dunfold normalise,
   dunfold herm_norm,
-  rw mul_lin_left,
-  rw mul_antilin_right,
+  rw inprod_smul_left,
+  rw inprod_smul_right,
   rw conj_of_real,
   rw mul_re,
   rw mul_re,
@@ -689,26 +653,26 @@ begin
   rw sub_zero,
   rw of_real_re,
   rw ←sqrt_one,
-  rw sqrt_inj (mul_nonneg (inv_nonneg.mpr (sqrt_nonneg (x ∘ x).re)) (mul_nonneg (inv_nonneg.mpr (sqrt_nonneg (x ∘ x).re)) (is_pos_def x).left)) (zero_le_one), 
+  rw sqrt_inj (mul_nonneg (inv_nonneg.mpr (sqrt_nonneg (x ∘ x).re)) (mul_nonneg (inv_nonneg.mpr (sqrt_nonneg (x ∘ x).re)) (inprod_self_re_nonneg x))) (zero_le_one), 
   rw ←sqrt_inv,
   rw ←field.mul_assoc,
-  rw mul_self_sqrt, --(inv_nonneg.mpr (is_pos_def x).left),
+  rw mul_self_sqrt, --(inv_nonneg.mpr (inprod_self_re_nonneg x)),
   rw field.inv_mul_cancel, 
-    exact (ne_zero_im_zero_imp_re_ne_zero (inprod_self_ne_zero_iff.mpr ho) (inprod_self_real x)),
-    exact (inv_nonneg.mpr (is_pos_def x).left),
+    exact (ne_zero_im_zero_imp_re_ne_zero (inprod_self_ne_zero_iff.mpr ho) (inprod_self_im x)),
+    exact (inv_nonneg.mpr (inprod_self_re_nonneg x)),
 end
 
-def normalise_set {V : Type u} [herm_inner_product_space V] :
-set V → set V := image(λ x, ↑|x|⁻¹ • x)
+def normalise_set :
+set α → set α := image(λ x, ↑|x|⁻¹ • x)
 
-lemma normalise_set_normalises {V : Type u} [herm_inner_product_space V] 
-(A : set V) (Ho : (0 : V) ∉ A) : 
+lemma normalise_set_normalises 
+(A : set α) (Ho : (0 : α) ∉ A) : 
 ∀ x ∈ normalise_set(A), is_normalised x :=
 begin
   dunfold normalise_set,
   dunfold image, 
   intros,
-  have Ha : ∃ (a : V), a ∈ A ∧ normalise a = x,
+  have Ha : ∃ (a : α), a ∈ A ∧ normalise a = x,
     rw mem_set_of_eq at H, 
     exact H,
   apply (exists.elim Ha),
@@ -721,81 +685,81 @@ begin
   exact normalise_normalises a ho,
 end
 
-def herm_ortho {V : Type u} [herm_inner_product_space V] (x y : V) : Prop := x ∘ y = 0 
+def herm_ortho (x y : α) : Prop := x ∘ y = 0 
 
 notation a ⊥ b := herm_ortho a b 
 
-def herm_ortho_sym {V :Type u} [herm_inner_product_space V] (x y : V) :
-(x ⊥ y) ↔ (y ⊥ x) := ortho_sym (conj_is_invo) x y 
+def herm_ortho_sym (x y : α) :
+(x ⊥ y) ↔ (y ⊥ x) := ortho_sym (conj.ring_invo) x y 
 
-lemma ortho_refl_iff_zero {V : Type u} [herm_inner_product_space V] (x : V) : 
-(x ⊥ x) ↔ x = 0 := (is_pos_def x).right
+lemma ortho_refl_iff_zero (x : α) : 
+(x ⊥ x) ↔ x = 0 := (inprod_self_eq_zero x)
 
-def herm_ortho_mul_left {V : Type u} [herm_inner_product_space V] (x y : V) (a : ℂ) (ha : a ≠ 0) : 
-(x ⊥ y) ↔ ((a • x) ⊥ y) := ortho_mul_left (conj_is_invo) x y a ha
+def herm_ortho_mul_left (x y : α) (a : ℂ) (ha : a ≠ 0) : 
+(x ⊥ y) ↔ ((a • x) ⊥ y) := ortho_mul_left (conj.ring_invo) x y a ha
 
-def herm_ortho_mul_right {V :Type u} [herm_inner_product_space V] (x y : V) (a : ℂ) (ha : a ≠ 0) : 
-(x ⊥ y) ↔ (x ⊥ (a • y)) := ortho_mul_right (conj_is_invo) x y a ha
+def herm_ortho_mul_right (x y : α) (a : ℂ) (ha : a ≠ 0) : 
+(x ⊥ y) ↔ (x ⊥ (a • y)) := ortho_mul_right (conj.ring_invo) x y a ha
 
-theorem ortho_imp_not_lindep {V :Type u} [herm_inner_product_space V] (x y : V) (hx : x ≠ 0) (hy : y ≠ 0) : 
+theorem ortho_imp_not_lindep (x y : α) (hx : x ≠ 0) (hy : y ≠ 0) : 
 (x ⊥ y) → ¬∃ (a : ℂ), (a ≠ 0) ∧ (x = a • y ∨ a • x = y) :=
 begin
   intros H1,
   apply not_exists.mpr,
   intros a,
   intros H2,
-  dunfold herm_ortho at H1,
+  unfold herm_ortho at H1,
   cases H2 with ha H2,
   cases H2,  
     rw H2 at H1,
-    rw mul_lin_left at H1,
+    rw inprod_smul_left at H1,
     rw mul_eq_zero at H1,
     cases H1,
       trivial, 
 
-      exact hy (((is_pos_def y).right).mp H1),
+      exact hy (((inprod_self_eq_zero y)).mp H1),
     
     rw ←H2 at H1,
-    rw mul_antilin_right at H1,
+    rw inprod_smul_right at H1,
     rw mul_eq_zero at H1,
     cases H1,
       exact ha ((conj_eq_zero).mp H1),
 
-      exact hx (((is_pos_def x).right).mp H1),
+      exact hx (((inprod_self_eq_zero x)).mp H1),
 end
 
-theorem pythag_iden {V : Type u} [herm_inner_product_space V] (x y : V) (H : x ⊥ y) :
+theorem pythag_iden (x y : α) (H : x ⊥ y) :
 |x + y|^2 = |x|^2 + |y|^2 :=
 begin
   dunfold herm_norm,
-  rw sqr_sqrt (is_pos_def (x + y)).left,
-  rw sqr_sqrt (is_pos_def x).left,
-  rw sqr_sqrt (is_pos_def y).left,
+  rw sqr_sqrt (inprod_self_re_nonneg (x + y)),
+  rw sqr_sqrt (inprod_self_re_nonneg x),
+  rw sqr_sqrt (inprod_self_re_nonneg y),
   rw inprod_self_add,
-  dunfold herm_ortho at H,
-  rw [is_conj_sym y x, H],
+  unfold herm_ortho at H,
+  rw [←conj_inprod x y, H],
   rw conj_zero,
   rw field.add_zero,
   rw field.add_zero,
   rw add_re,
 end
 
-def is_ortho_set {V : Type u} [herm_inner_product_space V] (s : set V) :=
+def is_ortho_set (s : set α) :=
 ∀ x y ∈ s, (x ⊥ y) ↔ x ≠ y 
 
-def is_orthonormal_set {V : Type u} [herm_inner_product_space V] (s : set V) :=
+def is_orthonormal_set (s : set α) :=
 is_ortho_set s ∧ ∀ x ∈ s, is_normalised x
 
-noncomputable def proj {V : Type u} [herm_inner_product_space V] (x y : V) :=
+noncomputable def proj (x y : α) :=
 ((x ∘ y)/( ↑|y|*|y| )) • y
 
-lemma zero_proj {V : Type u} [herm_inner_product_space V] (x : V) :
+lemma zero_proj (x : α) :
 proj 0 x = 0 := by dunfold proj; simp
 
-lemma proj_zero {V : Type u} [herm_inner_product_space V] (x : V) :
+lemma proj_zero (x : α) :
 proj x 0 = 0 := by dunfold proj; simp
 
-lemma proj_self_eq_self {V : Type u} [herm_inner_product_space V] (x : V) :
+lemma proj_self_eq_self (x : α) :
 proj x x = x :=
 begin
   have ho : x = 0 ∨ x ≠ 0,
@@ -811,16 +775,16 @@ begin
     rw one_smul,
 end
 
-lemma smul_proj {V : Type u} [herm_inner_product_space V] (x y : V) {a : ℂ} : 
+lemma smul_proj (x y : α) {a : ℂ} : 
 proj (a • x) y = a • (proj x y) :=
 begin
   dunfold proj,
-  rw mul_lin_left,
+  rw inprod_smul_left,
   rw smul_smul,
   ring,
 end
 
-lemma proj_smul {V : Type u} [herm_inner_product_space V] (x y : V) {a : ℂ} (ha : a ≠ 0) :
+lemma proj_smul (x y : α) {a : ℂ} (ha : a ≠ 0) :
 proj x (a • y) = proj x y := 
 begin
   have Hy : y = 0 ∨ y ≠ 0,
@@ -830,7 +794,7 @@ begin
     rw smul_zero,
 
     dunfold proj,
-    rw mul_antilin_right,
+    rw inprod_smul_right,
     rw herm_norm_smul,
     rw of_real_mul,
     rw smul_smul,
@@ -866,7 +830,7 @@ begin
     exact of_real_ne_zero.mpr ((iff_false_right ha).mp (norm_sq_eq_zero)),
 end
 
-lemma norm_proj_le {V : Type u} [herm_inner_product_space V] (x y : V) : 
+lemma norm_proj_le (x y : α) : 
 |proj x y| ≤ |x| :=
 begin
   have Hy : y = 0 ∨ y ≠ 0,
@@ -892,12 +856,12 @@ begin
     rw field.mul_comm,
     rw ←division_def,
     rw div_le_iff,
-      exact cauchy_schwarz_innequality x y,
+      exact abs_inprod_le_mul_herm_norm x y,
       exact (norm_pos_iff y).mpr Hy,
       exact norm_ne_zero_iff_ne_zero.mpr Hy,
 end
 
-lemma ortho_imp_proj_eq_zero {V : Type u} [herm_inner_product_space V] {x y : V} :
+lemma ortho_imp_proj_eq_zero {x y : α} :
 (x ⊥ y) → proj x y = 0 := 
 begin
   dunfold herm_ortho,
@@ -907,7 +871,7 @@ begin
   simp,
 end
 
-lemma proj_eq_self_iff_lindep {V : Type u} [herm_inner_product_space V] {x y : V} :
+lemma proj_eq_self_iff_lindep {x y : α} :
 proj x y = x ↔ ∃ (a : ℂ), x = a • y :=
 begin
   split,
@@ -922,8 +886,10 @@ begin
     rw proj_self_eq_self, 
 end
 
-class Hilbert_space (V : Type u) extends herm_inner_product_space V :=
-(complete : ∀{f : filter V}, cauchy f → ∃x, f ≤ nhds x) 
+end herm_inner_product_space
 
-instance Hilbert_space.to_complete_space (V : Type u) [Hilbert_space V] : complete_space V :=
-{complete := @Hilbert_space.complete V _}
+class Hilbert_space (α : Type*) extends herm_inner_product_space α :=
+(complete : ∀{f : filter α}, cauchy f → ∃x, f ≤ nhds x) 
+
+instance Hilbert_space.to_complete_space (α : Type*) [Hilbert_space α] : complete_space α :=
+{complete := @Hilbert_space.complete α _}
