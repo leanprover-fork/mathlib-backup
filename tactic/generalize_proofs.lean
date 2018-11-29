@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Mario Carneiro
 -/
 
+import tactic.basic
+
 namespace tactic
 
 private meta def collect_proofs_in :
@@ -56,5 +58,16 @@ do intros_dep,
    hs ← local_context >>= mfilter is_proof,
    t ← target,
    collect_proofs_in t [] (ns, hs) >> skip
+
+namespace interactive
+
+open lean.parser interactive interactive.types
+local postfix *:9001 := many
+
+/-- Generalize proofs in the goal, naming them with the provided list. -/
+meta def generalize_proofs : parse ident_* → tactic unit :=
+tactic.generalize_proofs
+
+end interactive
 
 end tactic

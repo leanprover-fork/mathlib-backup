@@ -3,9 +3,7 @@ Copyright (c) 2017 Mario Carneiro. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Mario Carneiro, Simon Hudon, Sebastien Gouezel, Scott Morrison
 -/
-import data.dlist data.dlist.basic data.prod category.basic
-  tactic.basic tactic.rcases tactic.generalize_proofs
-  tactic.split_ifs logic.basic tactic.ext tactic.tauto tactic.replacer
+import logic.basic
 
 open lean
 open lean.parser
@@ -16,64 +14,6 @@ local postfix *:9001 := many
 namespace tactic
 namespace interactive
 open interactive interactive.types expr
-
-/--
-The `rcases` tactic is the same as `cases`, but with more flexibility in the
-`with` pattern syntax to allow for recursive case splitting. The pattern syntax
-uses the following recursive grammar:
-
-```
-patt ::= (patt_list "|")* patt_list
-patt_list ::= id | "_" | "⟨" (patt ",")* patt "⟩"
-```
-
-A pattern like `⟨a, b, c⟩ | ⟨d, e⟩` will do a split over the inductive datatype,
-naming the first three parameters of the first constructor as `a,b,c` and the
-first two of the second constructor `d,e`. If the list is not as long as the
-number of arguments to the constructor or the number of constructors, the
-remaining variables will be automatically named. If there are nested brackets
-such as `⟨⟨a⟩, b | c⟩ | d` then these will cause more case splits as necessary.
-If there are too many arguments, such as `⟨a, b, c⟩` for splitting on
-`∃ x, ∃ y, p x`, then it will be treated as `⟨a, ⟨b, c⟩⟩`, splitting the last
-parameter as necessary.
-
-`rcases` also has special support for quotient types: quotient induction into Prop works like
-matching on the constructor `quot.mk`.
-
-`rcases? e` will perform case splits on `e` in the same way as `rcases e`,
-but rather than accepting a pattern, it does a maximal cases and prints the
-pattern that would produce this case splitting. The default maximum depth is 5,
-but this can be modified with `rcases? e : n`.
--/
-meta def rcases : parse rcases_parse → tactic unit
-| (p, sum.inl ids) := tactic.rcases p ids
-| (p, sum.inr depth) := do
-  patt ← tactic.rcases_hint p depth,
-  pe ← pp p,
-  trace $ ↑"snippet: rcases " ++ pe ++ " with " ++ to_fmt patt
-
-/--
-The `rintro` tactic is a combination of the `intros` tactic with `rcases` to
-allow for destructuring patterns while introducing variables. See `rcases` for
-a description of supported patterns. For example, `rintros (a | ⟨b, c⟩) ⟨d, e⟩`
-will introduce two variables, and then do case splits on both of them producing
-two subgoals, one with variables `a d e` and the other with `b c d e`.
-
-`rintro?` will introduce and case split on variables in the same way as
-`rintro`, but will also print the `rintro` invocation that would have the same
-result. Like `rcases?`, `rintro? : n` allows for modifying the
-depth of splitting; the default is 5.
--/
-meta def rintro : parse rintro_parse → tactic unit
-| (sum.inl []) := intros []
-| (sum.inl l)  := tactic.rintro l
-| (sum.inr depth) := do
-  ps ← tactic.rintro_hint depth,
-  trace $ ↑"snippet: rintro" ++ format.join (ps.map $ λ p,
-    format.space ++ format.group (p.format tt))
-
-/-- Alias for `rintro`. -/
-meta def rintros := rintro
 
 /--
 This is a "finishing" tactic modification of `simp`. The tactic `simpa [rules, ...] using e`
@@ -153,10 +93,6 @@ do gs ← get_goals,
    | (some g) := set_goals (g :: gs.remove_nth (n-1))
    | _        := skip
    end
-
-/-- Generalize proofs in the goal, naming them with the provided list. -/
-meta def generalize_proofs : parse ident_* → tactic unit :=
-tactic.generalize_proofs
 
 /-- Clear all hypotheses starting with `_`, like `_match` and `_let_match`. -/
 meta def clear_ : tactic unit := tactic.repeat $ do
@@ -263,16 +199,6 @@ optional arguments:
 meta def solve_by_elim (no_dflt : parse only_flag) (hs : parse simp_arg_list)  (attr_names : parse with_ident_list) (opt : by_elim_opt := { }) : tactic unit :=
 do asms ← mk_assumption_set no_dflt hs attr_names,
    tactic.solve_by_elim { assumptions := return asms ..opt }
-
-/--
-`tautology` breaks down assumptions of the form `_ ∧ _`, `_ ∨ _`, `_ ↔ _` and `∃ _, _`
-and splits a goal of the form `_ ∧ _`, `_ ↔ _` or `∃ _, _` until it can be discharged
-using `reflexivity` or `solve_by_elim`
--/
-meta def tautology (c : parse $ (tk "!")?) := tactic.tautology c.is_some
-
-/-- Shorter name for the tactic `tautology`. -/
-meta def tauto (c : parse $ (tk "!")?) := tautology c
 
 /-- Make every propositions in the context decidable -/
 meta def classical := tactic.classical
