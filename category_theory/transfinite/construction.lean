@@ -24,8 +24,12 @@ by cases p; cases q; simp
 
 lemma I_change_hom (I : category_theory.transfinite.morphism_class C)
   {a b a' b' : C} {ea : a' = a} {eb : b' = b}
-  (f : a ⟶ b) : I (change_hom a b ea eb f) ↔ I f :=
+  (f : a ⟶ b) : I (eq_to_hom ea ≫ f ≫ eq_to_hom eb.symm) ↔ I f :=
 by cases ea; cases eb; simp
+
+lemma I_change_hom' (I : category_theory.transfinite.morphism_class C)
+  {a b a' : C} {ea : a' = a} (f : a ⟶ b) : I (eq_to_hom ea ≫ f) ↔ I f :=
+by cases ea; simp
 
 variables {D : Type u'} [𝒟 : category.{u' v'} D]
 include 𝒟
@@ -125,6 +129,10 @@ def inclusion_functor : β ⥤ γ :=
 def embed {j j' : γ} (h : j ≤ j') : below_top j ⥤ below_top j' :=
 inclusion_functor (below_initial_seg h)
 
+@[simp] lemma embed_obj_val {j j' : γ} (h : j ≤ j') (p : below_top j) :
+  ((embed h).obj p).val = p.val :=
+rfl
+
 end
 
 namespace category_theory.transfinite
@@ -189,6 +197,9 @@ variables
 
 variables (F : γ ⥤ C)
 
+-- TODO: Somehow this got a bit too complicated, we have inclusion_functor and also embed?
+-- I guess it's okay, just put the related definitions together
+
 def restriction : β ⥤ C := inclusion_functor f ⋙ F
 
 lemma smooth_at_iff_restriction_smooth_at (i : β) :
@@ -196,6 +207,151 @@ lemma smooth_at_iff_restriction_smooth_at (i : β) :
 sorry
 
 end restrict
+
+section extension
+  
+-- * k is the stage we're constructing
+-- * Z encodes the choices of all the earlier segments
+-- * hZ is the condition that these were compatible
+
+parameters {γ : Type v} [lattice.order_top γ] [is_well_order γ (<)]
+parameters {k : γ} (Z : Π (i < k), transfinite_composition I (below_top i))
+parameters (hZ : ∀ i i' (hik : i < k) (hi'k : i' < k) (hii' : i < i'),
+  (Z i hik).F = embed (le_of_lt hii') ⋙ (Z i' hi'k).F)
+
+-- We can include the case i = i' for free
+lemma hZ' : ∀ i i' (hik : i < k) (hi'k : i' < k) (hii' : i ≤ i'),
+  (Z i hik).F = embed hii' ⋙ (Z i' hi'k).F :=
+sorry
+
+-- Using the previous choices, we can define a functor on the open interval [⊥, k)
+
+def prev_F : {i // i < k} ⥤ C :=
+{ obj := λ p, (Z p.val p.property).F.obj ⊤,
+  map := λ p p' hpp',
+    eq_to_hom (eq_obj (hZ' p.val p'.val p.property p'.property hpp'.down.down) _) ≫
+    (Z p'.val p'.property).F.map hpp',
+  map_id' := λ p, by erw (Z _ _).F.map_id; simp; refl,
+  map_comp' := λ p p' p'' hpp' hp'p'', let hZ' := hZ' in begin
+    rw eq_hom (hZ' p'.val p''.val p'.property p''.property hp'p''.down.down)
+      (show (⟨p.val, hpp'.down.down⟩ : below_top p'.val) ⟶ (⟨p'.val, le_refl _⟩ : below_top p'.val),
+       from hpp'),
+    dsimp,
+    simp,
+    congr,
+    apply (Z p''.val p''.property).F.map_comp,
+  end }
+
+-- Now, the new stuff!
+-- * X is the new object
+-- * f encodes maps from the previous objects to X
+-- * hf is the condition that these maps form a cocone
+parameters (X : C) (f : Π i (hik : i < k), (Z i hik).F.obj ⊤ ⟶ X)
+parameters (hf : ∀ i i' (hik : i < k) (hi'k : i' < k) (hii' : i ≤ i'),
+  f i hik =
+  eq_to_hom (eq_obj (hZ' i i' hik hi'k hii') ⊤) ≫
+  (Z i' hi'k).F.map ⟨⟨lattice.le_top⟩⟩ ≫ f i' hi'k)
+
+include hf
+
+def prev_cocone : limits.cocone prev_F :=
+{ X := X,
+  ι :=
+  { app := λ p, f p.val p.property,
+    naturality' := λ p p' hpp', begin
+      dsimp [prev_F] { iota := tt },
+      rw hf p.val p'.val p.property p'.property hpp'.down.down,
+      simp, congr
+    end } }
+
+-- Now build the new underlying functor
+def extend_tcomp_F : below_top k ⥤ C :=
+{ obj := λ p, if hp : p.val < k then prev_F.obj ⟨p.val, hp⟩ else X,
+  map := λ p p' hpp',
+    if hp' : p'.val < k then
+      have hp : p.val < k, from lt_of_le_of_lt hpp'.down.down hp',
+      change_hom (prev_F.obj ⟨p.val, hp⟩) (prev_F.obj ⟨p'.val, hp'⟩) --((Z p'.val hp').F.obj ⟨p.val, hpp'.down.down⟩) ((Z p'.val hp').F.obj ⊤)
+        (by simp [hp]) (by simp [hp'])
+      (prev_F.map hpp')
+    else if hp : p.val < k then
+      change_hom (prev_F.obj ⟨p.val, hp⟩) X (by simp [hp]) (by simp [hp']) (f p.val hp)
+    else
+      change_hom X X (by simp [hp]) (by simp [hp']) (𝟙 X),
+  map_id' := λ p,
+    by split_ifs; { dsimp [change_hom], try { erw prev_F.map_id }, simp },
+  map_comp' := λ p p' p'' hpp' hp'p'', let hf := hf in begin
+    by_cases hp'' : p''.val < k,
+    { have hp' : p'.val < k, from lt_of_le_of_lt hp'p''.down.down hp'',
+      have hp : p.val < k, from lt_of_le_of_lt hpp'.down.down hp',
+      simp [hp, hp', hp''],
+      erw prev_F.map_comp,
+      simp },
+    by_cases hp' : p'.val < k,
+    { have hp : p.val < k, from lt_of_le_of_lt hpp'.down.down hp',
+      simp [hp, hp', hp''],
+      dsimp [prev_F] { iota := tt },
+      simp [hf p.val p'.val hp hp' hpp'.down.down],
+      congr },
+    by_cases hp : p.val < k; { simp [hp, hp', hp'', change_hom] }
+  end }
+
+lemma extend_tcomp_F_extends (i) (hik : i < k) :
+  embed (le_of_lt hik) ⋙ extend_tcomp_F = (Z i hik).F :=
+let hZ' := hZ' in
+begin
+  dunfold extend_tcomp_F,
+  fapply category_theory.functor.ext,
+  { rintro ⟨p₁, p₂⟩,
+    have hp : p₁ < k, from lt_of_le_of_lt p₂ hik,
+    simpa [hp, prev_F] using eq_obj (hZ' p₁ i _ _ p₂) ⊤ },
+  { rintro ⟨p₁, p₂⟩ ⟨p'₁, p'₂⟩ hpp',
+    have hp : p₁ < k, from lt_of_le_of_lt p₂ hik,
+    have hp' : p'₁ < k, from lt_of_le_of_lt p'₂ hik,
+    dsimp, simp [hp, hp'],
+    dsimp [prev_F] { iota := tt },
+    erw eq_hom (hZ' p'₁ i hp' hik p'₂) ⟨⟨_⟩⟩,
+    dsimp, simp, congr }
+end
+
+-- Assumptions needed to guarantee that the new functor is still a
+-- transfinite composition
+
+-- TODO: put the actual conditions here
+parameters (hsucc : ∀ j (hjk : is_succ j k), I (f j hjk.lt))
+parameters (hlimit : is_limit k → limits.is_colimit prev_cocone)
+include hsucc hlimit
+
+set_option pp.implicit true
+def extend_tcomp : transfinite_composition I (below_top k) :=
+{ F := extend_tcomp_F,
+  succ := λ p p' spp', begin
+    dunfold extend_tcomp_F,
+    have hp : p.val < k, from lt_of_lt_of_le spp'.lt p'.property,
+    by_cases hp' : p'.val < k,
+    { simp [hp, hp', I_change_hom I], dsimp [prev_F], simp [I_change_hom' I],
+      apply (Z p'.val hp').succ,
+      rwa is_succ_iff at ⊢ spp' },
+    { have : p'.val = k, from (eq_or_lt_of_le p'.property).resolve_right hp',
+      have : I (f p.val hp), by apply hsucc; rwa [is_succ_iff, this] at spp',
+      simpa [hp, hp', I_change_hom I] using this }
+  end,
+  limit := λ p plim, let extend_tcomp_F := extend_tcomp_F in begin
+    by_cases hp : p.val < k,    -- TODO: use some other cases thing to get equality, and above
+    { apply (smooth_at_iff_restriction_smooth_at (below_initial_seg (le_of_lt hp))
+        extend_tcomp_F (⊤ : below_top p.val)).mpr,
+      dsimp [restriction],
+      erw extend_tcomp_F_extends,
+      apply (Z _ _).limit,
+      rwa is_limit_iff at ⊢ plim },
+    { have hp : p.val = k, from (eq_or_lt_of_le p.property).resolve_right hp,
+      rw [is_limit_iff, hp] at plim,
+      -- Help?
+      sorry }
+  end }
+
+end extension
+
+#exit
 
 parameters [limits.has_colimits C]
 parameters {γ : Type v} [lattice.order_top γ] [is_well_order γ (<)]
