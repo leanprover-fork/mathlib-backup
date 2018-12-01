@@ -148,7 +148,7 @@ begin
     dsimp, simp, congr }
 end
 
-lemma extend_tcomp_F_extends_prev :
+lemma extend_tcomp_F_extends_prev_F :
   full_subcategory_inclusion (λ p, p < ⊤) ⋙ extend_tcomp_F = prev_F :=
 begin
   dunfold extend_tcomp_F,
@@ -164,11 +164,18 @@ begin
     refl }
 end
 
+lemma extend_tcomp_F_top : extend_tcomp_F.obj ⊤ = new.X :=
+begin
+  dunfold extend_tcomp_F,
+  have : ¬((⊤ : below_top k).val < k), from lt_irrefl _,
+  simp [this], refl
+end
+
 -- Transport `new` to a cocone on the restriction of the extended
 -- functor `extend_tcomp_F`, for use in verifying the limit stage
 -- condition.
 def new' : limits.cocone (full_subcategory_inclusion (λ p, p < ⊤) ⋙ extend_tcomp_F) :=
-new.precompose (eq_to_hom extend_tcomp_F_extends_prev)
+new.precompose (eq_to_hom extend_tcomp_F_extends_prev_F)
 
 lemma new'_app (p e) : new'.ι.app p = eq_to_hom e ≫ f p.val.val p.property :=
 begin
@@ -207,7 +214,7 @@ include hsucc hlimit
 -- Using the above identifications, we conclude that the extended
 -- functor is smooth in the limit case.
 lemma extend_tcomp_F_smooth (hk : is_limit k) : smooth_at extend_tcomp_F ⊤ :=
-⟨(is_colimit_of_iso (eq_to_iso extend_tcomp_F_extends_prev) (hlimit hk)).of_iso_colimit
+⟨(is_colimit_of_iso (eq_to_iso extend_tcomp_F_extends_prev_F) (hlimit hk)).of_iso_colimit
   extend_tcomp_F_cone_iso.symm⟩
 
 def extend_tcomp : transfinite_composition I (below_top k) :=
