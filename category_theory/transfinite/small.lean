@@ -26,17 +26,17 @@ section
 variables {C : Type u} [𝒞 : category.{u v} C]
 include 𝒞
 
--- `X` is small with respect to `I` if there exists a (regular?)
--- cardinal `κ` such that any map from `X` to the end of a transfinite
--- composition of maps from `I` whose length has cofinality at least
--- `κ` factors through some earlier object in the composition.
-def small (I : morphism_class C) (X : C) : Prop :=
-∃ (κ : cardinal),               -- TODO: regular as well?
+-- X is κ-small with respect to I if any map from X to the end of a
+-- transfinite composition of maps from I whose length has cofinality
+-- at least κ factors through some earlier object in the composition.
+def κ_small (I : morphism_class C) (κ : cardinal) (X : C) : Prop :=
 ∀ (γ : Type v) [lattice.order_top γ], by exactI ∀ [is_well_order γ (<)],
   κ ≤ (ordinal.type ((<) : γ → γ → Prop)).cof →
 ∀ (c : transfinite_composition I γ) (f : X ⟶ c.F.obj ⊤),
 ∃ (j : γ) (hj : j < ⊤) (g : X ⟶ c.F.obj j),
   g ≫ c.F.map ⟨⟨lattice.le_top⟩⟩ = f
+
+def small (I : morphism_class C) (X : C) : Prop := ∃ κ, κ_small I κ X
 
 end
 

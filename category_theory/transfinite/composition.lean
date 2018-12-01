@@ -68,6 +68,9 @@ sorry
 lemma not_is_succ_bot {i : γ} : ¬is_succ i bot :=
 sorry
 
+lemma has_succ_of_lt_top {i : γ} (h : i < ⊤) : ∃ j, is_succ i j :=
+sorry
+
 
 def is_limit : γ → Prop :=
 sorry
