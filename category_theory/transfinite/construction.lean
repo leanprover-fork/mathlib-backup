@@ -19,19 +19,13 @@ parameters {I : morphism_class C}
 parameters {γ : Type v} [lattice.order_top γ] [is_well_order γ (<)]
 
 
-variables (F : C ⥤ C) (α : functor.id C ⟹ F)
-
-
--- no! use an inductive Prop
-def strict_image : morphism_class C :=
-λ X Y f, Y = F.obj X ∧ f == α.app X
-
-def strict_image_intro {X : C} : strict_image F α (α.app X) := ⟨rfl, heq.rfl⟩
+variables (F : C ⥤ C) (α : functor.id C ⟹ F) (hα : ∀ X, I (α.app X))
+include hα
 
 noncomputable def build_transfinite_composition (X : C) :
-  Σ' (c : transfinite_composition (strict_image F α) γ), c.F.obj bot = X :=
+  Σ' (c : transfinite_composition I γ), c.F.obj bot = X :=
 begin
-  have ci : Π (i : γ), Σ' (c : transfinite_composition (strict_image F α) (below_top i)),
+  have ci : Π (i : γ), Σ' (c : transfinite_composition I (below_top i)),
     c.F.obj bot = X,
   { refine crec (is_well_order.wf (<))
       (λ i i hii' c c', c.1.F = embed (le_of_lt hii') ⋙ c'.1.F) _,
@@ -39,7 +33,7 @@ begin
     let Z' := λ i hi, (Z i hi).1,
     rcases is_bot_or_succ_or_limit j with ⟨_,rfl⟩|⟨i,_,hij⟩|⟨_,hj⟩;
     [refine ⟨⟨extend2.extend_tcomp_bot Z' hZ rfl X, _⟩, _⟩,
-     refine ⟨⟨extend2.extend_tcomp_succ Z' hZ hij (α.app _) (by apply strict_image_intro), _⟩, _⟩,
+     refine ⟨⟨extend2.extend_tcomp_succ Z' hZ hij (α.app _) (hα _), _⟩, _⟩,
      refine ⟨⟨extend2.extend_tcomp_limit Z' hZ hj, _⟩, _⟩],
     all_goals { try { apply extend1.extend_tcomp_F_extends } },
     apply extend2.extend_tcomp_bot_bot,

@@ -1,4 +1,7 @@
 import category_theory.transfinite.small
+import category_theory.transfinite.construction
+
+noncomputable theory
 
 universes u v
 
@@ -23,6 +26,8 @@ parameters {κ : cardinal.{v}} (A_small : ∀ ⦃i⦄, κ_small I κ (A i))
 parameters {γ : Type v} [lattice.order_top γ] [is_well_order γ (<)]
 parameters (hκ : κ ≤ (ordinal.type ((<) : γ → γ → Prop)).cof)
 
+section
+
 -- Suppose we've constructed a transfinite composition of maps from I of length γ
 parameters (c : transfinite_composition I γ)
 
@@ -34,6 +39,31 @@ let ⟨j, hj, g, hg⟩ := A_small γ hκ c h,
     ⟨k, hk⟩ := hI _ (c.succ j j' hj') g in
 ⟨k ≫ c.F.map ⟨⟨lattice.le_top⟩⟩,
  by rw [←category.assoc, ←hk, ←hg, category.assoc, ←functor.map_comp]; refl⟩
+
+end
+
+section
+
+parameters (F : C ⥤ C) (α : functor.id C ⟹ F)
+parameters (hα : ∀ X, I (α.app X))
+
+def fibrant_replacement_cell_complex (X) :
+  Σ' (c : transfinite_composition I γ), c.F.obj bot = X :=
+build_transfinite_composition F α hα X
+
+def fibrant_replacement (X : C) : C :=
+(fibrant_replacement_cell_complex X).fst.F.obj ⊤
+
+def fibrant_unit (X : C) : X ⟶ fibrant_replacement X :=
+eq_to_hom (fibrant_replacement_cell_complex X).snd.symm ≫
+(fibrant_replacement_cell_complex X).fst.F.map ⟨⟨lattice.le_top⟩⟩
+
+lemma fibrant_replacement_fibrant {X} {i} (h : A i ⟶ fibrant_replacement X) :
+  ∃ l : B i ⟶ fibrant_replacement X, h = f i ≫ l :=
+replacement_injective (fibrant_replacement_cell_complex X).fst h
+
+end
+
 
 end
 end transfinite
