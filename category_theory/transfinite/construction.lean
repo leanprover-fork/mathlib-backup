@@ -31,47 +31,38 @@ def strict_image_intro {X : C} : strict_image F α (α.app X) := ⟨rfl, heq.rfl
 noncomputable def build_transfinite_composition (X : C) :
   Σ' (c : transfinite_composition (strict_image F α) γ), c.F.obj bot = X :=
 begin
-  suffices : Π (i : γ), Σ' (c : transfinite_composition (strict_image F α) (below_top i)),
-    i = bot → c.F.obj bot = X,
-  { have c' := this ⊤,
-    refine ⟨⟨to_below_top.comp c'.fst.F, _, _⟩, _⟩,
-    { intros i j h, apply c'.fst.succ, rwa is_succ_iff },
-    { intros j h,
-      have := c'.fst.limit (to_below_top.obj j) (by rwa is_limit_iff),
-      dsimp [smooth_at] at ⊢ this,
-      -- This is a mess--we need to show that the transported diagram is still a colimit
-      sorry },
-    { sorry -- Instead, use compatibility with earlier stages... this all needs reorg
-      -- For that matter, we should be able to use crec_def and avoid carrying this
-      -- condition at all.
-/-
-      convert c'.snd _ using 1,
-      change c'.fst.F.obj _ = _,
-      congr,
-      rw is_bot_iff,
-      refl -/ } },
+  have ci : Π (i : γ), Σ' (c : transfinite_composition (strict_image F α) (below_top i)),
+    c.F.obj bot = X,
+  { refine crec (is_well_order.wf (<))
+      (λ i i hii' c c', c.1.F = embed (le_of_lt hii') ⋙ c'.1.F) _,
+    rintros j ⟨Z, hZ⟩,
+    let Z' := λ i hi, (Z i hi).1,
+    rcases is_bot_or_succ_or_limit j with ⟨_,rfl⟩|⟨i,_,hij⟩|⟨_,hj⟩;
+    [refine ⟨⟨extend2.extend_tcomp_bot Z' hZ rfl X, _⟩, _⟩,
+     refine ⟨⟨extend2.extend_tcomp_succ Z' hZ hij (α.app _) (by apply strict_image_intro), _⟩, _⟩,
+     refine ⟨⟨extend2.extend_tcomp_limit Z' hZ hj, _⟩, _⟩],
+    all_goals { try { apply extend1.extend_tcomp_F_extends } },
+    apply extend2.extend_tcomp_bot_bot,
+    all_goals
+    { have : bot < j, from sorry,
+      have : (bot : below_top j) = (embed (le_of_lt this)).obj bot, from sorry,
+      change (extend1.extend_tcomp_F _ _ _).obj _ = _,
+      rw this,
+      change (embed _ ⋙ extend1.extend_tcomp_F _ _ _).obj _ = _,
+      rw ←extend1.extend_tcomp_F_extends,
+      apply (Z bot _).snd } },
 
-  refine crec (is_well_order.wf (<))
-    (λ i i hii' p p', p.1.F = embed (le_of_lt hii') ⋙ p'.1.F) _,
-  rintros j ⟨Z, hZ⟩,
-
-  rcases is_bot_or_succ_or_limit j with ⟨_,rfl⟩|⟨i,_,hij⟩|⟨_,hj⟩,
-
-  { refine ⟨⟨_, _⟩, _⟩,
-    { exact extend2.extend_tcomp_bot (λ i hi, (Z i hi).1) hZ rfl X },
-    { intro, apply extend2.extend_tcomp_bot_bot },
-    { apply extend1.extend_tcomp_F_extends } },
-
-  { refine ⟨⟨_, _⟩, _⟩,
-    { refine extend2.extend_tcomp_succ (λ i hi, (Z i hi).1) hZ hij (α.app _) _,
-      apply strict_image_intro },
-    { intro hj', subst j, exact absurd hij not_is_succ_bot },
-    { apply extend1.extend_tcomp_F_extends } },
-
-  { refine ⟨⟨_, _⟩, _⟩,
-    { exact extend2.extend_tcomp_limit (λ i hi, (Z i hi).1) hZ hj },
-    { intro hj', subst j, exact absurd hj not_is_limit_bot },
-    { apply extend1.extend_tcomp_F_extends } }
+  -- TODO: Construct the new transfinite composition at a higher level
+  refine ⟨⟨to_below_top.comp (ci ⊤).1.F, _, _⟩, _⟩,
+  { intros i j h, apply (ci ⊤).1.succ, rwa is_succ_iff },
+  { intros j h,
+    have := (ci ⊤).1.limit (to_below_top.obj j) (by rwa is_limit_iff),
+    dsimp [smooth_at] at ⊢ this,
+    -- This is a mess--we need to show that the transported diagram is still a colimit
+    sorry },
+  { change (ci ⊤).1.F.obj _ = X,
+    convert (ci ⊤).snd,
+    rw is_bot_iff, refl }
 end
 
 end
