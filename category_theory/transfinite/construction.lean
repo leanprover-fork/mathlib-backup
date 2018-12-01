@@ -31,6 +31,11 @@ lemma I_change_hom' (I : category_theory.transfinite.morphism_class C)
   {a b a' : C} {ea : a' = a} (f : a ⟶ b) : I (eq_to_hom ea ≫ f) ↔ I f :=
 by cases ea; simp
 
+lemma is_colimit_of_iso {J : Type v} [small_category J] {F G : J ⥤ C} (α : F ≅ G)
+  {t : limits.cocone G} (ht : limits.is_colimit t) :
+  limits.is_colimit (t.precompose α.hom) :=
+sorry                           -- TODO
+
 variables {D : Type u'} [𝒟 : category.{u' v'} D]
 include 𝒟
 
@@ -52,6 +57,10 @@ by subst h
 lemma category_theory.functor.eq_hom {F G : C ⥤ D} (h : F = G) {X Y} (f : X ⟶ Y) :
   F.map f = eq_to_hom (category_theory.functor.eq_obj h X) ≫ G.map f ≫ eq_to_hom (category_theory.functor.eq_obj h Y).symm :=
 by subst h; simp
+
+@[simp] lemma category_theory.nat_trans.eq_to_hom_app {F G : C ⥤ D} (h : F = G) (X : C) :
+  (eq_to_hom h : F ⟹ G).app X = eq_to_hom (category_theory.functor.eq_obj h X) :=
+by subst h; refl
 
 -- We actually don't need this?
 universes u'' v'' u''' v'''
@@ -91,6 +100,12 @@ def below_initial_seg {j j' : γ} (h : j ≤ j') : initial_seg ((<) : below_top 
   inj := by tidy,
   init := λ ⟨i, hi⟩ ⟨i', hi'⟩ hii', ⟨⟨i', le_trans (le_of_lt hii') hi⟩, rfl⟩ }
 
+def open_to_closed (j : γ) : initial_seg ((<) : {i // i < j} → {i // i < j} → Prop) ((<) : below_top j → below_top j → Prop) :=
+{ to_fun := λ i, ⟨i.val, le_of_lt i.property⟩,
+  ord := by tidy,
+  inj := by tidy,
+  init := λ ⟨i, hi⟩ ⟨i', hi'⟩ hii', ⟨⟨i', lt_trans hii' hi⟩, rfl⟩ }
+
 /-
 def embed {j j' : γ} (h : j ≤ j') : below_top j ⥤ below_top j' :=
 { obj := λ i, ⟨i.val, le_trans i.property h⟩,
@@ -100,6 +115,18 @@ def embed {j j' : γ} (h : j ≤ j') : below_top j ⥤ below_top j' :=
 end
 
 section
+
+section
+variables {β γ : Type v} [partial_order β] [partial_order γ]
+def iseg (β γ) [partial_order β] [partial_order γ] := initial_seg ((<) : β → β → Prop) ((<) : γ → γ → Prop)
+
+variables (f : iseg β γ)
+
+def inclusion_functor : β ⥤ γ :=
+{ obj := f.to_fun,
+  map := λ b₁ b₂ h, ⟨⟨sorry⟩⟩ }
+end
+
 variables {γ : Type v} [lattice.order_top γ]
 
 def to_below_top : γ ⥤ below_top (⊤ : γ) :=
@@ -116,15 +143,6 @@ sorry
 
 lemma is_limit_iff (j : γ) (i : below_top j) : is_limit i ↔ is_limit i.1 :=
 sorry
-
-variables
-  {β : Type v} [lattice.order_top β] [is_well_order β (<)]
-  -- {γ : Type v} [lattice.order_top γ] [is_well_order γ (<)]
-  (f : initial_seg ((<) : β → β → Prop) ((<) : γ → γ → Prop))
-
-def inclusion_functor : β ⥤ γ :=
-{ obj := f,
-  map := λ b₁ b₂ h, ⟨⟨sorry⟩⟩ }
 
 def embed {j j' : γ} (h : j ≤ j') : below_top j ⥤ below_top j' :=
 inclusion_functor (below_initial_seg h)
@@ -243,17 +261,21 @@ def prev_F : {i // i < k} ⥤ C :=
   end }
 
 -- Now, the new stuff!
+parameters (new : limits.cocone prev_F)
+
 -- * X is the new object
 -- * f encodes maps from the previous objects to X
 -- * hf is the condition that these maps form a cocone
-parameters (X : C) (f : Π i (hik : i < k), (Z i hik).F.obj ⊤ ⟶ X)
-parameters (hf : ∀ i i' (hik : i < k) (hi'k : i' < k) (hii' : i ≤ i'),
+
+def X := new.X
+def f : Π i (hik : i < k), (Z i hik).F.obj ⊤ ⟶ X := λ i hik, new.ι.app ⟨i, hik⟩
+def hf : ∀ i i' (hik : i < k) (hi'k : i' < k) (hii' : i ≤ i'),
   f i hik =
   eq_to_hom (eq_obj (hZ' i i' hik hi'k hii') ⊤) ≫
-  (Z i' hi'k).F.map ⟨⟨lattice.le_top⟩⟩ ≫ f i' hi'k)
+  (Z i' hi'k).F.map ⟨⟨lattice.le_top⟩⟩ ≫ f i' hi'k :=
+sorry
 
-include hf
-
+/-
 def prev_cocone : limits.cocone prev_F :=
 { X := X,
   ι :=
@@ -263,6 +285,7 @@ def prev_cocone : limits.cocone prev_F :=
       rw hf p.val p'.val p.property p'.property hpp'.down.down,
       simp, congr
     end } }
+-/
 
 -- Now build the new underlying functor
 def extend_tcomp_F : below_top k ⥤ C :=
@@ -313,18 +336,59 @@ begin
     dsimp, simp, congr }
 end
 
+lemma extend_tcomp_F_extends_prev :
+  inclusion_functor (open_to_closed k) ⋙ extend_tcomp_F = prev_F :=
+sorry
+
+def comparison : iseg {i // i < k} {i : below_top k // i < ⊤} :=
+{ to_fun := λ i, ⟨⟨i.val, le_of_lt i.property⟩, i.property⟩,
+  ord := sorry,
+  inj := sorry,
+  init := sorry }
+
+def new' : limits.cocone (inclusion_functor (open_to_closed k) ⋙ extend_tcomp_F) :=
+--eq.rec_on extend_tcomp_F_extends_prev.symm new
+new.precompose (eq_to_hom extend_tcomp_F_extends_prev)
+
+lemma new'_app (j : {i // i < k}) (e) :
+  new'.ι.app j = eq_to_hom e ≫ f j.val j.property :=
+begin
+  dsimp [f, new', limits.cocone.precompose],
+  simp,
+  cases j, refl
+end
+
+lemma extend_tcomp_F_cone :
+  ((extend_tcomp_F).map_cocone (cocone_at ⊤)).whisker (inclusion_functor comparison) ≅
+  new' :=
+begin
+  ext, swap,
+  { exact category_theory.eq_to_iso (dif_neg (not_lt_of_le (le_refl k))) },
+  { dsimp [extend_tcomp_F],
+    have : ¬((⊤ : below_top k).val < k), from not_lt_of_le (le_refl k),
+    simp [this],
+    dsimp [inclusion_functor, comparison, full_subcategory_inclusion],
+    have : j.val < k, from j.property,
+    simp [this],
+    rw new'_app }
+end
+
 -- Assumptions needed to guarantee that the new functor is still a
 -- transfinite composition
 
--- TODO: put the actual conditions here
 parameters (hsucc : ∀ j (hjk : is_succ j k), I (f j hjk.lt))
-parameters (hlimit : is_limit k → limits.is_colimit prev_cocone)
+parameters (hlimit : is_limit k → limits.is_colimit new)
 include hsucc hlimit
 
-set_option pp.implicit true
+def hlimit' (hk : is_limit k) : limits.is_colimit new' :=
+is_colimit_of_iso (eq_to_iso extend_tcomp_F_extends_prev) (hlimit hk)
+
+lemma blah : limits.is_colimit ((extend_tcomp_F).map_cocone (cocone_at ⊤)) := sorry
+
 def extend_tcomp : transfinite_composition I (below_top k) :=
+let blah  := blah in
 { F := extend_tcomp_F,
-  succ := λ p p' spp', begin
+  succ := λ p p' spp', let f := f in begin
     dunfold extend_tcomp_F,
     have hp : p.val < k, from lt_of_lt_of_le spp'.lt p'.property,
     by_cases hp' : p'.val < k,
@@ -345,8 +409,9 @@ def extend_tcomp : transfinite_composition I (below_top k) :=
       rwa is_limit_iff at ⊢ plim },
     { have hp : p.val = k, from (eq_or_lt_of_le p.property).resolve_right hp,
       rw [is_limit_iff, hp] at plim,
-      -- Help?
-      sorry }
+      have : p = (⊤ : below_top k), from subtype.eq hp, rw this,
+      refine ⟨_⟩,
+      apply blah }
   end }
 
 end extension

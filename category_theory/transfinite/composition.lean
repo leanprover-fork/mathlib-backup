@@ -20,6 +20,8 @@ instance (j : γ) : partial_order (below j) := by dunfold below; apply_instance
 def cocone_at (j : γ) : cocone (full_subcategory_inclusion (λ i, i < j)) :=
 { X := j, ι := { app := λ i, ⟨⟨le_of_lt i.property⟩⟩ } }
 
+@[simp] lemma cocone_at_X (j : γ) : (cocone_at j).X = j := rfl
+
 include 𝒞
 
 def smooth_at (F : γ ⥤ C) (j : γ) : Prop :=
