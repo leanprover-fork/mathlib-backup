@@ -1,4 +1,4 @@
-import category_theory.transfinite.misc
+import category_theory.transfinite.extend2
 
 noncomputable theory
 
@@ -11,7 +11,7 @@ universes u v
 namespace category_theory.transfinite
 section
 
-parameters {C : Type u} [𝒞 : category.{u v} C]
+parameters {C : Type u} [𝒞 : category.{u v} C] [limits.has_colimits C]
 include 𝒞
 
 parameters {I : morphism_class C}
@@ -26,11 +26,13 @@ variables (F : C ⥤ C) (α : functor.id C ⟹ F)
 def strict_image : morphism_class C :=
 λ X Y f, Y = F.obj X ∧ f == α.app X
 
+def strict_image_intro {X : C} : strict_image F α (α.app X) := ⟨rfl, heq.rfl⟩
+
 noncomputable def build_transfinite_composition (X : C) :
   Σ' (c : transfinite_composition (strict_image F α) γ), c.F.obj bot = X :=
 begin
   suffices : Π (i : γ), Σ' (c : transfinite_composition (strict_image F α) (below_top i)),
-    c.F.obj bot = X,
+    i = bot → c.F.obj bot = X,
   { have c' := this ⊤,
     refine ⟨⟨to_below_top.comp c'.fst.F, _, _⟩, _⟩,
     { intros i j h, apply c'.fst.succ, rwa is_succ_iff },
@@ -39,39 +41,37 @@ begin
       dsimp [smooth_at] at ⊢ this,
       -- This is a mess--we need to show that the transported diagram is still a colimit
       sorry },
-    { convert c'.snd using 1,
+    { sorry -- Instead, use compatibility with earlier stages... this all needs reorg
+      -- For that matter, we should be able to use crec_def and avoid carrying this
+      -- condition at all.
+/-
+      convert c'.snd _ using 1,
       change c'.fst.F.obj _ = _,
       congr,
       rw is_bot_iff,
-      refl } },
+      refl -/ } },
 
   refine crec (is_well_order.wf (<))
-    (λ i i hii' p p', embed (le_of_lt hii') ⋙ p'.1.F = p.1.F) _,
+    (λ i i hii' p p', p.1.F = embed (le_of_lt hii') ⋙ p'.1.F) _,
   rintros j ⟨Z, hZ⟩,
 
   rcases is_bot_or_succ_or_limit j with ⟨_,rfl⟩|⟨i,_,hij⟩|⟨_,hj⟩,
 
-  { refine ⟨⟨⟨(category_theory.functor.const _).obj X, _, _⟩, _⟩, _⟩,
-    { intros i j h,
-      refine absurd (lt_of_lt_of_le h.lt _) (not_lt_bot _),
-      change j.val ≤ _,
-      convert j.property,
-      rw ←is_bot_iff },
-    { intros j h,
-      refine absurd j.property (not_le_of_lt _),
-      convert h.bot_lt,
-      symmetry,
-      rw ←is_bot_iff },
-    { refl },
-    { exact λ j h, absurd h (not_lt_bot _) } },
+  { refine ⟨⟨_, _⟩, _⟩,
+    { exact extend2.extend_tcomp_bot (λ i hi, (Z i hi).1) hZ rfl X },
+    { intro, apply extend2.extend_tcomp_bot_bot },
+    { apply extend1.extend_tcomp_F_extends } },
 
-  all_goals { sorry },
+  { refine ⟨⟨_, _⟩, _⟩,
+    { refine extend2.extend_tcomp_succ (λ i hi, (Z i hi).1) hZ hij (α.app _) _,
+      apply strict_image_intro },
+    { intro hj', subst j, exact absurd hij not_is_succ_bot },
+    { apply extend1.extend_tcomp_F_extends } },
 
-/-
-  { refine ⟨⟨⟨_, _, _⟩, _⟩, _⟩,
-    -- Should do some preliminary constructions first.
-    -- Extending a functor from `below_top j` to `below_top j'` where `is_succ j j'`, etc.
-}, -/
+  { refine ⟨⟨_, _⟩, _⟩,
+    { exact extend2.extend_tcomp_limit (λ i hi, (Z i hi).1) hZ hj },
+    { intro hj', subst j, exact absurd hj not_is_limit_bot },
+    { apply extend1.extend_tcomp_F_extends } }
 end
 
 end

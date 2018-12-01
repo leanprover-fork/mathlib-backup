@@ -115,6 +115,7 @@ end succ
 
 section limit
 parameters (hk : is_limit k)
+include hk                      -- TODO: can probably remove this later
 
 def extend_tcomp_limit : transfinite_composition I (below_top k) :=
 extend1.extend_tcomp Z hZ (limits.colimit.cocone _)

@@ -65,11 +65,17 @@ le_of_lt h.lt
 lemma is_succ.le_of_lt_succ {i' i j : γ} (h : is_succ i j) : i' < j → i' ≤ i :=
 sorry
 
+lemma not_is_succ_bot {i : γ} : ¬is_succ i bot :=
+sorry
+
 
 def is_limit : γ → Prop :=
 sorry
 
 lemma is_limit.bot_lt {j : γ} (h : is_limit j) : bot < j :=
+sorry
+
+lemma not_is_limit_bot : ¬is_limit (bot : γ) :=
 sorry
 
 inductive bot_or_succ_or_limit : γ → Type v

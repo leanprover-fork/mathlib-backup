@@ -131,9 +131,10 @@ def extend_tcomp_F : below_top k ⥤ C :=
 
 -- TODO: Does the following lemma trivialize this one?
 lemma extend_tcomp_F_extends (i) (hik : i < k) :
-  embed (le_of_lt hik) ⋙ extend_tcomp_F = (Z i hik).F :=
+  (Z i hik).F = embed (le_of_lt hik) ⋙ extend_tcomp_F :=
 let hZ' := hZ' in
 begin
+  symmetry,
   dunfold extend_tcomp_F,
   fapply category_theory.functor.ext,
   { rintro ⟨p₁, p₂⟩,
@@ -237,7 +238,7 @@ def extend_tcomp : transfinite_composition I (below_top k) :=
     { apply (smooth_at_iff_restriction_smooth_at (below_initial_seg (le_of_lt hp))
         extend_tcomp_F (⊤ : below_top p.val)).mpr,
       dsimp [restriction],
-      erw extend_tcomp_F_extends,
+      erw ←extend_tcomp_F_extends,
       apply (Z _ _).limit,
       rwa is_limit_iff at ⊢ plim },
     { have hp : p.val = k, from (eq_or_lt_of_le p.property).resolve_right hp,
