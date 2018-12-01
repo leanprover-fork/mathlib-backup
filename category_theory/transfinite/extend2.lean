@@ -11,6 +11,49 @@ section
 
 open category_theory category_theory.functor
 
+/- Note on building transfinite compositions
+
+Suppose our aim is to construct a transfinite composition of some
+particular "length" γ, γ being a well-ordered type with a greatest
+element. This consists of a collection of objects X i for i : γ and
+morphisms X i → X j for i j : γ, i ≤ j satisfying some conditions. We
+want to construct these by transfinite recursion, forming a colimit at
+limit stages and applying some other construction at successor stages.
+
+This is tricky to do by a direct recursion because the objects and
+morphisms depend on each other. Obviously the map we append at stage
+i+1 must depend on the object X i, but at limit stages we need to form
+the next object as a colimit and this construction depends on all the
+previous maps. Moreover, in order to continue the construction and
+form this colimit, we need to use the fact that the maps chosen so far
+actually do define a functor.
+
+In order to organize this construction, we apply the principle of
+"consistent recursion". Namely, we will construct for each i : γ a
+transfinite composition on the closed initial segment [⊥, i] of γ,
+while requiring that for each i < j, the transfinite composition on
+[⊥, i] is (strictly!) equal to the restriction of the transfinite
+composition on [⊥, j]. (This condition relies on the ability to talk
+about the *set* of objects of a category. If we wanted to use only
+equivalence-invariant concepts, we'd need to instead construct
+isomorphisms here which in turn satisfy some coherence conditions.)
+At the end of the process, we have a transfinite composition on [⊥, ⊤]
+which we transfer to the original type γ.
+
+This section contains the building blocks for such a construction. For
+each type of i (base case, successor case and limit case), we provide
+a constructor for building a transfinite composition on [⊥, i] from
+consistent transfinite compositions on the earlier segments, and a
+lemma showing that the new transfinite composition is consistent with
+the previous ones. We also provide a "finalizing" constructor which
+transfers a transfinite composition on [⊥, ⊤] to γ.
+
+(TODO: Probably want something more general for this last step, namely
+restricting a transfinite composition along the inclusion of an
+initial segment (ordinal.initial_seg). Then apply to γ → [⊥, ⊤].)
+
+-/
+
 -- General parameters for constructing a transfinite composition
 parameters {C : Type u} [𝒞 : category.{u v} C] [limits.has_colimits C]
 include 𝒞

@@ -1,11 +1,11 @@
 import data.pfun
 
-universe u
+universes u v
 
 section
 parameters {α : Type u} {r : α → α → Prop} (hwf : well_founded r)
 local infix `<` := r
-parameters {C : α → Type u} (q : Π ⦃i j⦄ (h : i < j), C i → C j → Prop)
+parameters {C : α → Type v} (q : Π ⦃i j⦄ (h : i < j), C i → C j → Prop)
 parameters
   (H : Π (a : α)
          (f : {f : Π (i : α), i < a → C i // ∀ i j ria rja rij, q rij (f i ria) (f j rja)}),
