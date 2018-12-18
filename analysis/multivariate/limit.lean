@@ -27,6 +27,22 @@ theorem val_image_subset (s : set α) (t : set (subtype s)) : t.image val ⊆ s 
 theorem val_image_univ (s : set α) : @val _ s '' set.univ = s :=
 set.eq_of_subset_of_subset (val_image_subset _ _) (λ x xs, ⟨⟨x, xs⟩, ⟨set.mem_univ _, rfl⟩⟩)
 
+theorem image_preimage_val (s t : set α) : 
+  (@subtype.val _ s) '' ((@subtype.val _ s) ⁻¹' t) = t ∩ s :=
+begin
+  ext x, simp, split,
+  { rintros ⟨y, ys, yt, yx⟩, rw ←yx, exact ⟨yt, ys⟩ },
+  rintros ⟨xt, xs⟩, exact ⟨x, xs, xt, rfl⟩
+end
+
+theorem preimage_val_eq_preimage_val_iff (s t u : set α) : 
+  ((@subtype.val _ s) ⁻¹' t = (@subtype.val _ s) ⁻¹' u) ↔ (t ∩ s = u ∩ s) :=
+begin
+  rw [←image_preimage_val, ←image_preimage_val],
+  split, { intro h, rw h },
+  intro h, exact set.injective_image (val_injective) h
+end
+
 end subtype
 
 /-
@@ -181,6 +197,9 @@ begin
   intros h z y rzy syz, exact h y rzy z syz
 end
 
+def restrict_domain (r : rel α β) (s : set α) : rel {x // x ∈ s} β :=
+λ x y, r x.val y
+
 end rel
 
 /-
@@ -191,10 +210,15 @@ namespace function
 
 def graph (f : α → β) : rel α β := λ x y, f x = y
 
+def restrict (f : α → β) (s : set α) : subtype s → β := λ x, f x.val
+
+theorem restrict_eq (f : α → β) (s : set α): function.restrict f s = f ∘ (@subtype.val _ s) := rfl
+
 end function
 
 namespace set
 
+section
 local attribute [instance] classical.prop_decidable
 
 theorem inter_subset (a b c : set α) : a ∩ b ⊆ c ↔ a ⊆ -b ∪ c :=
@@ -202,7 +226,9 @@ begin
   split,
   { intros h x xa, by_cases h' : x ∈ b, simp [h ⟨xa, h'⟩], simp [h'] },
   intros h x, rintro ⟨xa, xb⟩, cases h xa, contradiction, assumption
-end 
+end
+
+end
 
 -- TODO: if image were defined with bounded quantification in corelib, the next two would 
 -- be definitional
@@ -257,7 +283,7 @@ by { simp [res], split; {intro h, simp [h]} }
 theorem mem_dom (f : α →. β) (x : α) : x ∈ dom f ↔ ∃ y, y ∈ f x :=
 by simp [dom, set.mem_def, roption.dom_iff_mem]
 
-theorem dom_eq (f : α →. β) : dom f = { x | ∃ y, y ∈ f x } :=
+theorem dom_eq (f : α →. β) : dom f = {x | ∃ y, y ∈ f x} :=
 set.ext (mem_dom f)
 
 theorem res_univ (f : α → β) : pfun.res f set.univ = f :=
@@ -265,6 +291,10 @@ rfl
 
 -- TODO: change pfun.graph to this
 def graph' (f : α →. β) : rel α β := λ x y, y ∈ f x 
+
+lemma as_subtype_eq_of_mem {f : α →. β} {x : α} {y : β} (fxy : y ∈ f x) (domx : x ∈ f.dom) :
+  f.as_subtype ⟨x, domx⟩ = y :=
+roption.mem_unique (roption.get_mem _) fxy
 
 end pfun
 
@@ -295,6 +325,9 @@ lemma preimage_def (s : set β) : preimage f s = {x | ∃ y ∈ s, y ∈ f x} :=
 def mem_preimage (s : set β) (x : α) : x ∈ preimage f s ↔ ∃ y ∈ s, y ∈ f x :=
 iff.refl _
 
+lemma preimage_subset_dom (s : set β) : f.preimage s ⊆ f.dom :=
+assume x ⟨y, ys, fxy⟩, roption.dom_iff_mem.mpr ⟨y, fxy⟩ 
+
 lemma preimage_mono {s t : set β} (h : s ⊆ t) : f.preimage s ⊆ f.preimage t :=
 rel.preimage_mono _ h
 
@@ -314,10 +347,14 @@ lemma core_def (s : set β) : core f s = {x | ∀ y, y ∈ f x → y ∈ s} := r
 lemma mem_core (x : α) (s : set β) : x ∈ core f s ↔ (∀ y, y ∈ f x → y ∈ s) := 
 iff.rfl
 
+lemma compl_dom_subset_core (s : set β) : -f.dom ⊆ f.core s :=
+assume x hx y fxy, 
+absurd ((mem_dom f x).mpr ⟨y, fxy⟩) hx
+
 lemma core_mono {s t : set β} (h : s ⊆ t) : f.core s ⊆ f.core t :=
 rel.core_mono _ h
 
-lemma core_inter (f : α →. β) (s t : set β) : f.core (s ∩ t) = f.core s ∩ f.core t :=
+lemma core_inter (s t : set β) : f.core (s ∩ t) = f.core s ∩ f.core t :=
 rel.core_inter _ s t
 
 lemma mem_core_res (f : α → β) (s : set α) (t : set β) (x : α) : 
@@ -334,6 +371,39 @@ local attribute  [instance] classical.prop_decidable
 lemma core_res (f : α → β) (s : set α) (t : set β) : core (res f s) t = -s ∪ f ⁻¹' t :=
 by { ext, rw mem_core_res, by_cases h : x ∈ s; simp [h] }
 
+end
+
+lemma core_restrict (f : α → β) (s : set β) : core (f : α →. β) s = set.preimage f s :=
+by ext x; simp [core_def]
+
+lemma preimage_subset_core (f : α →. β) (s : set β) : f.preimage s ⊆ f.core s :=
+assume x ⟨y, ys, fxy⟩ y' fxy',
+have y = y', from roption.mem_unique fxy fxy',
+this ▸ ys
+
+lemma preimage_eq (f : α →. β) (s : set β) : f.preimage s = f.core s ∩ f.dom :=
+set.eq_of_subset_of_subset 
+  (set.subset_inter (preimage_subset_core f s) (preimage_subset_dom f s)) 
+  (assume x ⟨xcore, xdom⟩, 
+    let y := (f x).get xdom in
+    have ys : y ∈ s, from xcore _ (roption.get_mem _),
+    show x ∈ preimage f s, from  ⟨(f x).get xdom, ys, roption.get_mem _⟩)
+
+lemma core_eq (f : α →. β) (s : set β) : f.core s = f.preimage s ∪ -f.dom :=
+by rw [preimage_eq, set.union_distrib_right, set.union_comm (dom f), set.compl_union_self,
+        set.inter_univ, set.union_eq_self_of_subset_right (compl_dom_subset_core f s)]
+
+lemma preimage_as_subtype (f : α →. β) (s : set β) : 
+  f.as_subtype ⁻¹' s = subtype.val ⁻¹' pfun.preimage f s :=
+begin
+  ext x, 
+  simp only [set.mem_preimage_eq, set.mem_set_of_eq, pfun.as_subtype, pfun.mem_preimage],
+  show pfun.fn f (x.val) _ ∈ s ↔ ∃ y ∈ s, y ∈ f (x.val),
+  exact iff.intro 
+    (assume h, ⟨_, h, roption.get_mem _⟩)
+    (assume ⟨y, ys, fxy⟩, 
+      have f.fn x.val x.property ∈ f x.val := roption.get_mem _,
+      roption.mem_unique fxy this ▸ ys)
 end
 
 end pfun
@@ -377,6 +447,21 @@ begin
   intro h, refine ⟨_, h, t, set.subset.refl t, _⟩,
   rintros x ⟨hx, xt⟩,
   exact hx xt
+end
+
+theorem tendsto_if {l₁ : filter α} {l₂ : filter β} 
+    {f g : α → β} {p : α → Prop} [decidable_pred p]
+    (h₀ : tendsto f (l₁ ⊓ principal p) l₂) 
+    (h₁ : tendsto g (l₁ ⊓ principal { x | ¬ p x }) l₂) :
+  tendsto (λ x, if p x then f x else g x) l₁ l₂ :=
+begin
+  revert h₀ h₁, simp only [tendsto_def, mem_inf_principal],
+  intros h₀ h₁ s hs,
+  apply mem_sets_of_superset (inter_mem_sets (h₀ s hs) (h₁ s hs)),
+  rintros x ⟨hp₀, hp₁⟩, dsimp,
+  by_cases h : p x, 
+  { rw if_pos h, exact hp₀ h }, 
+  rw if_neg h, exact hp₁ h
 end
 
 end filter
@@ -453,11 +538,9 @@ begin
   apply h _ t tl₂ (set.subset.refl _), 
 end 
 
-/-
-Interestingly, there does not seem to be a way to express this relation using a forward map.
-Given a filter `f` on `α`, we want a filter `f'` on `β` such that `r.preimage s ∈ f.sets` if 
-and only if `s ∈ f'`. But the intersection of two sets satsifying the lhs may be empty.  
--/
+-- Interestingly, there does not seem to be a way to express this relation using a forward map.
+-- Given a filter `f` on `α`, we want a filter `f'` on `β` such that `r.preimage s ∈ f.sets` if 
+-- and only if `s ∈ f'`. But the intersection of two sets satsifying the lhs may be empty.  
 
 def rcomap' (r : rel α β) (f : filter β) : filter α :=
 { sets             := rel.image (λ s t, r.preimage s ⊆ t) f.sets,
@@ -502,6 +585,14 @@ begin
   intros h s t ht h', apply mem_sets_of_superset (h t ht) h'  
 end
 
+theorem tendsto_iff_rtendsto (l₁ : filter α) (l₂ : filter β) (f : α → β) :
+  tendsto f l₁ l₂ ↔ rtendsto (function.graph f) l₁ l₂ :=
+by { simp [tendsto_def, function.graph, rtendsto_def, rel.core, set.preimage] }
+
+theorem tendsto_iff_rtendsto' (l₁ : filter α) (l₂ : filter β) (f : α → β) :
+  tendsto f l₁ l₂ ↔ rtendsto' (function.graph f) l₁ l₂ :=
+by { simp [tendsto_def, function.graph, rtendsto'_def, rel.preimage_def, set.preimage] }
+
 end filter
 
 /-
@@ -523,6 +614,10 @@ theorem ptendsto_def (f : α →. β) (l₁ : filter α) (l₂ : filter β) :
   ptendsto f l₁ l₂ ↔ ∀ s ∈ l₂.sets, f.core s ∈ l₁.sets :=
 iff.refl _
 
+theorem ptendsto_iff_rtendsto (l₁ : filter α) (l₂ : filter β) (f : α →. β) :
+  ptendsto f l₁ l₂ ↔ rtendsto f.graph' l₁ l₂ :=
+iff.refl _
+
 theorem pmap_res (l : filter α) (s : set α) (f : α → β) :
   pmap (pfun.res f s) l = map f (l ⊓ principal s) :=
 filter_eq $ 
@@ -539,37 +634,35 @@ theorem tendsto_iff_ptendsto (l₁ : filter α) (l₂ : filter β) (s : set α) 
   tendsto f (l₁ ⊓ principal s) l₂ ↔ ptendsto (pfun.res f s) l₁ l₂ :=
 by simp only [tendsto, ptendsto, pmap_res]
 
-theorem tendsto_iff_ptendsto' (l₁ : filter α) (l₂ : filter β) (f : α → β) :
+theorem tendsto_iff_ptendsto_univ (l₁ : filter α) (l₂ : filter β) (f : α → β) :
   tendsto f l₁ l₂ ↔ ptendsto (pfun.res f set.univ) l₁ l₂ :=
 by { rw ← tendsto_iff_ptendsto, simp [principal_univ] }
 
-/- relate relational version to function and partial function versions -/
+def pcomap' (f : α →. β) (l : filter β) : filter α :=
+filter.rcomap' f.graph' l
 
-theorem ptendsto_iff_rtendsto (l₁ : filter α) (l₂ : filter β) (f : α →. β) :
-  ptendsto f l₁ l₂ ↔ rtendsto f.graph' l₁ l₂ :=
-iff.refl _
+def ptendsto' (f : α →. β) (l₁ : filter α) (l₂ : filter β) := l₁ ≤ l₂.rcomap' f.graph'
 
-theorem tendsto_iff_rtendsto (l₁ : filter α) (l₂ : filter β) (f : α → β) :
-  tendsto f l₁ l₂ ↔ rtendsto (function.graph f) l₁ l₂ :=
-by { simp [tendsto_def, function.graph, rtendsto_def, rel.core, set.preimage] }
+theorem ptendsto'_def (f : α →. β) (l₁ : filter α) (l₂ : filter β) :
+  ptendsto' f l₁ l₂ ↔ ∀ s ∈ l₂.sets, f.preimage s ∈ l₁.sets :=
+rtendsto'_def _ _ _
 
-theorem tendsto_iff_rtendsto' (l₁ : filter α) (l₂ : filter β) (f : α → β) :
-  tendsto f l₁ l₂ ↔ rtendsto' (function.graph f) l₁ l₂ :=
-by { simp [tendsto_def, function.graph, rtendsto'_def, rel.preimage_def, set.preimage] }
-
-theorem tendsto_if {l₁ : filter α} {l₂ : filter β} 
-    {f g : α → β} {p : α → Prop} [decidable_pred p]
-    (h₀ : tendsto f (l₁ ⊓ principal p) l₂) 
-    (h₁ : tendsto g (l₁ ⊓ principal { x | ¬ p x }) l₂) :
-  tendsto (λ x, if p x then f x else g x) l₁ l₂ :=
+theorem ptendsto_of_ptendsto' {f : α →. β} {l₁ : filter α} {l₂ : filter β} : 
+  ptendsto' f l₁ l₂ → ptendsto f l₁ l₂ :=
 begin
-  revert h₀ h₁, simp only [tendsto_def, mem_inf_principal],
-  intros h₀ h₁ s hs,
-  apply mem_sets_of_superset (inter_mem_sets (h₀ s hs) (h₁ s hs)),
-  rintros x ⟨hp₀, hp₁⟩, dsimp,
-  by_cases h : p x, 
-  { rw if_pos h, exact hp₀ h }, 
-  rw if_neg h, exact hp₁ h
+  rw [ptendsto_def, ptendsto'_def],
+  assume h s sl₂,
+  exacts mem_sets_of_superset (h s sl₂) (pfun.preimage_subset_core _ _),
+end
+
+theorem ptendsto'_of_ptendsto {f : α →. β} {l₁ : filter α} {l₂ : filter β} (h : f.dom ∈ l₁.sets) : 
+  ptendsto f l₁ l₂ → ptendsto' f l₁ l₂ :=
+begin
+  rw [ptendsto_def, ptendsto'_def],
+  assume h' s sl₂,
+  rw pfun.preimage_eq,
+  show pfun.core f s ∩ pfun.dom f ∈ l₁.sets,
+  exact inter_mem_sets (h' s sl₂) h
 end
 
 end filter
@@ -579,6 +672,89 @@ open filter
 section
 
 variable [topological_space α]
+
+/-
+Convergence to the nhds filter.
+-/
+
+theorem all_mem_nhds (x : α) (P : set α → Prop) (hP : ∀ s t, s ⊆ t → P s → P t) :
+  (∀ s ∈ (nhds x).sets, P s) ↔ (∀ s, is_open s → x ∈ s → P s) :=
+iff.intro 
+  (λ h s os xs, h s (mem_nhds_sets os xs))
+  (λ h t, 
+    begin
+      rw nhds_sets,
+      rintros ⟨s, hs, opens, xs⟩,
+      exact hP _ _ hs (h s opens xs),
+    end)
+
+theorem all_mem_nhds_filter (x : α) (f : set α → set β) (hf : ∀ s t, s ⊆ t → f s ⊆ f t) 
+    (l : filter β) : 
+  (∀ s ∈ (nhds x).sets, f s ∈ l.sets) ↔ (∀ s, is_open s → x ∈ s → f s ∈ l.sets) := 
+all_mem_nhds _ _ (λ s t ssubt h, mem_sets_of_superset h (hf s t ssubt))
+
+theorem rtendsto_nhds (r : rel β α) (l : filter β) (a : α) :
+  rtendsto r l (nhds a) ↔ (∀ s, is_open s → a ∈ s → r.core s ∈ l.sets) :=
+all_mem_nhds_filter _ _ (λ s t h, h) _
+
+theorem rtendsto'_nhds (r : rel β α) (l : filter β) (a : α) :
+  rtendsto' r l (nhds a) ↔ (∀ s, is_open s → a ∈ s → r.preimage s ∈ l.sets) :=
+by { rw [rtendsto'_def], apply all_mem_nhds_filter, apply rel.preimage_mono }
+
+theorem ptendsto_nhds (f : β →. α) (l : filter β) (a : α) :
+  ptendsto f l (nhds a) ↔ (∀ s, is_open s → a ∈ s → f.core s ∈ l.sets) :=
+rtendsto_nhds _ _ _
+
+theorem ptendsto'_nhds (f : β →. α) (l : filter β) (a : α) :
+  ptendsto' f l (nhds a) ↔ (∀ s, is_open s → a ∈ s → f.preimage s ∈ l.sets) :=
+rtendsto'_nhds _ _ _ 
+
+-- TODO: rename tendsto_nhds in topology to this
+theorem tendsto_nhds' (f : β → α) (l : filter β) (a : α) :
+  tendsto f l (nhds a) ↔ (∀ s, is_open s → a ∈ s → f ⁻¹' s ∈ l.sets) :=
+all_mem_nhds_filter _ _ (λ s t h, h) _
+
+/- nhds in the induced topology -/
+
+theorem mem_nhds_induced [T : topological_space α] (f : β → α) (a : β) (s : set β) : 
+  s ∈ (@nhds β (topological_space.induced f T) a).sets ↔ ∃ u ∈ (nhds (f a)).sets, f ⁻¹' u ⊆ s :=
+begin
+  simp only [nhds_sets, is_open_induced_iff, exists_prop, set.mem_set_of_eq], 
+  split,
+  { rintros ⟨u, usub, ⟨v, openv, ueq⟩, au⟩, 
+    exact ⟨v, ⟨v, set.subset.refl v, openv, by rwa ueq at au⟩, by rw ←ueq; exact usub⟩ }, 
+  rintros ⟨u, ⟨v, vsubu, openv, amem⟩, finvsub⟩,
+  exact ⟨f ⁻¹' v, set.subset.trans (set.preimage_mono vsubu) finvsub, ⟨⟨v, openv, rfl⟩, amem⟩⟩
+end
+
+theorem nhds_induced [T : topological_space α] (f : β → α) (a : β) : 
+  @nhds β (topological_space.induced f T) a = comap f (nhds (f a)) :=
+filter_eq $ by ext s; rw mem_nhds_induced; rw mem_comap_sets
+
+theorem map_nhds_induced_of_surjective [T : topological_space α] 
+    {f : β → α} (hf : function.surjective f) (a : β) (s : set α) : 
+  map f (@nhds β (topological_space.induced f T) a) = nhds (f a) :=
+by rw [nhds_induced, map_comap_of_surjective hf]
+
+/- 
+The nhds filter and the subspace topology. 
+-/
+
+theorem mem_nhds_subtype (s : set α) (a : {x // x ∈ s}) (t : set {x // x ∈ s}) : 
+  t ∈ (nhds a).sets ↔ ∃ u ∈ (nhds a.val).sets, (@subtype.val α s) ⁻¹' u ⊆ t :=
+by rw mem_nhds_induced
+
+theorem nhds_subtype (s : set α) (a : {x // x ∈ s}) :
+  nhds a = comap subtype.val (nhds a.val) :=
+by rw nhds_induced
+
+theorem principal_subtype (s : set α) (t : set {x // x ∈ s}) :
+  principal t = comap subtype.val (principal (subtype.val '' t)) :=
+by rw comap_principal; rw set.preimage_image_eq; apply subtype.val_injective
+
+/-
+The nhds_within filter.
+-/
 
 def nhds_within (a : α) (s : set α) : filter α := nhds a ⊓ principal s
 
@@ -641,27 +817,6 @@ theorem nhds_within_inter' (a : α) (s t : set α) :
   nhds_within a (s ∩ t) = (nhds_within a s) ⊓ principal t :=
 by { unfold nhds_within, rw [←inf_principal, lattice.inf_assoc] }
 
-theorem rtendsto_nhds_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
-  rtendsto r (nhds_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, ∀ y, r x y → y ∈ t :=
-by simp [rtendsto_def, mem_nhds_within, set.subset_def, rel.mem_core]
-
-theorem rtendsto'_nhds_within (r : rel α β) (a : α) (s : set α) (l : filter β) :
-  rtendsto' r (nhds_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, ∃ y ∈ t, r x y :=
-by simp [rtendsto'_def, mem_nhds_within, set.subset_def, rel.mem_preimage]
-
-theorem ptendsto_nhds_within (f : α →. β) (a : α) (s : set α) (l : filter β) :
-  ptendsto f (nhds_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, ∀ y ∈ f x, y ∈ t :=
-by rw [ptendsto_iff_rtendsto, rtendsto_nhds_within, pfun.graph']
-
-theorem tendsto_nhds_within (f : α → β) (a : α) (s : set α) (l : filter β) :
-  tendsto f (nhds_within a s) l ↔ 
-    ∀ t ∈ l.sets, ∃ u, is_open u ∧ a ∈ u ∧ ∀ x ∈ u ∩ s, f x ∈ t :=
-by rw [tendsto_iff_ptendsto', ptendsto_nhds_within, pfun.res_univ]; 
-    simp only [pfun.coe_val, roption.mem_some_iff, forall_eq]
-
 theorem tendsto_if_nhds_within {f g : α → β} {p : α → Prop} [decidable_pred p]
     {a : α} {s : set α} {l : filter β}
     (h₀ : tendsto f (nhds_within a (s ∩ p)) l)
@@ -682,41 +837,9 @@ have h₁ : ∃ (i : set α), i ∈ {t : set α | a ∈ t ∧ is_open t},
   from ⟨set.univ, set.mem_univ _, is_open_univ⟩,
 by { rw [nhds_within_eq, map_binfi_eq h₀ h₁], simp only [map_principal] }
 
-/- nhds in the induced topology -/
-
-theorem mem_nhds_induced [T : topological_space α] (f : β → α) (a : β) (s : set β) : 
-  s ∈ (@nhds β (topological_space.induced f T) a).sets ↔ ∃ u ∈ (nhds (f a)).sets, f ⁻¹' u ⊆ s :=
-begin
-  simp only [nhds_sets, is_open_induced_iff, exists_prop, set.mem_set_of_eq], 
-  split,
-  { rintros ⟨u, usub, ⟨v, openv, ueq⟩, au⟩, 
-    exact ⟨v, ⟨v, set.subset.refl v, openv, by rwa ueq at au⟩, by rw ←ueq; exact usub⟩ }, 
-  rintros ⟨u, ⟨v, vsubu, openv, amem⟩, finvsub⟩,
-  exact ⟨f ⁻¹' v, set.subset.trans (set.preimage_mono vsubu) finvsub, ⟨⟨v, openv, rfl⟩, amem⟩⟩
-end
-
-theorem nhds_induced [T : topological_space α] (f : β → α) (a : β) : 
-  @nhds β (topological_space.induced f T) a = comap f (nhds (f a)) :=
-filter_eq $ by ext s; rw mem_nhds_induced; rw mem_comap_sets
-
-theorem map_nhds_induced_of_surjective [T : topological_space α] 
-    {f : β → α} (hf : function.surjective f) (a : β) (s : set α) : 
-  map f (@nhds β (topological_space.induced f T) a) = nhds (f a) :=
-by rw [nhds_induced, map_comap_of_surjective hf]
-
-/- nhds in the subspace topology -/
-
-theorem mem_nhds_subtype (s : set α) (a : {x // x ∈ s}) (t : set {x // x ∈ s}) : 
-  t ∈ (nhds a).sets ↔ ∃ u ∈ (nhds a.val).sets, (@subtype.val α s) ⁻¹' u ⊆ t :=
-by rw mem_nhds_induced
-
-theorem nhds_subtype (s : set α) (a : {x // x ∈ s}) :
-  nhds a = comap subtype.val (nhds a.val) :=
-by rw nhds_induced
-
-theorem principal_subtype (s : set α) (t : set {x // x ∈ s}) :
-  principal t = comap subtype.val (principal (subtype.val '' t)) :=
-by rw comap_principal; rw set.preimage_image_eq; apply subtype.val_injective
+/-
+nhds_within and subtypes
+-/
 
 theorem mem_nhds_within_subtype (s : set α) (a : {x // x ∈ s}) (t u : set {x // x ∈ s}) :
   t ∈ (nhds_within a u).sets ↔ 
@@ -739,10 +862,109 @@ begin
 end
 
 theorem tendsto_at_within_iff_subtype {s : set α} {a : α} (h : a ∈ s) (f : α → β) (l : filter β) :
-  tendsto f (nhds_within a s) l ↔ tendsto (f ∘ (@subtype.val _ s)) (nhds ⟨a, h⟩) l :=
-by rw [tendsto, tendsto, nhds_within_eq_map_subtype_val h, ←(@filter.map_map _ _ _ _ subtype.val)]
+  tendsto f (nhds_within a s) l ↔ tendsto (function.restrict f s) (nhds ⟨a, h⟩) l :=
+by rw [tendsto, tendsto, function.restrict, nhds_within_eq_map_subtype_val h, 
+    ←(@filter.map_map _ _ _ _ subtype.val)]
+
+/-
+Continuity. 
+-/
+
+section
+variable [topological_space β]
+
+def continuous_at (f : α → β) (x : α) := tendsto f (nhds x) (nhds (f x))
+
+def continuous_at_within (f : α → β) (x : α) (s : set α) : Prop := 
+tendsto f (nhds_within x s) (nhds (f x))
+
+def continuous_on (f : α → β) (s : set α) : Prop := ∀ x ∈ s, continuous_at_within f x s
+
+-- remove continuous_iff_tendsto
+theorem continuous_iff_continuous_at {f : α → β} : continuous f ↔ ∀ x, continuous_at f x :=
+continuous_iff_tendsto
+
+theorem continuous_at_within_univ (f : α → β) (x : α) : 
+   continuous_at_within f x set.univ ↔ continuous_at f x :=
+by rw [continuous_at, continuous_at_within, nhds_within_univ]
+
+theorem continuous_at_within_iff_continuous_at_restrict (f : α → β) {x : α} {s : set α} (h : x ∈ s) : 
+  continuous_at_within f x s ↔ continuous_at (function.restrict f s) ⟨x, h⟩ :=
+tendsto_at_within_iff_subtype h f _
+
+theorem continuous_on_iff {f : α → β} {s : set α} :
+  continuous_on f s ↔ ∀ x ∈ s, ∀ t : set β, is_open t → f x ∈ t → ∃ u, is_open u ∧ x ∈ u ∧ 
+    u ∩ s ⊆ f ⁻¹' t :=
+by simp only [continuous_on, continuous_at_within, tendsto_nhds', mem_nhds_within]
+
+theorem continuous_on_iff_continuous_restrict {f : α → β} {s : set α} :
+  continuous_on f s ↔ continuous (function.restrict f s) :=
+begin
+  rw [continuous_on, continuous_iff_continuous_at], split,
+  { rintros h ⟨x, xs⟩, 
+    exact (continuous_at_within_iff_continuous_at_restrict f xs).mp (h x xs) },
+  intros h x xs,
+  exact (continuous_at_within_iff_continuous_at_restrict f xs).mpr (h ⟨x, xs⟩)
+end
+
+theorem continuous_on_iff' {f : α → β} {s : set α} :
+  continuous_on f s ↔ ∀ t : set β, is_open t → ∃ u, is_open u ∧ f ⁻¹' t ∩ s = u ∩ s :=
+have ∀ t, is_open (function.restrict f s ⁻¹' t) ↔ ∃ (u : set α), is_open u ∧ f ⁻¹' t ∩ s = u ∩ s,
+  begin 
+    intro t, 
+    rw [is_open_induced_iff, function.restrict_eq, set.preimage_comp],
+    simp only [subtype.preimage_val_eq_preimage_val_iff], 
+  end, 
+by rw [continuous_on_iff_continuous_restrict, continuous]; simp only [this]
 
 end
+
+end
+
+/-
+Continuity and partial functions
+-/
+
+section
+
+variables [topological_space α] [topological_space β]
+
+theorem continuous_at_within_iff_ptendsto_res (f : α → β) {x : α} {s : set α} (xs : x ∈ s) :
+  continuous_at_within f x s ↔ ptendsto (pfun.res f s) (nhds x) (nhds (f x)) :=
+tendsto_iff_ptendsto _ _ _ _ 
+
+def pcontinuous (f : α →. β) := ∀ s, is_open s → is_open (f.preimage s)
+
+theorem open_dom_of_pcontinuous {f : α →. β} (h : pcontinuous f) : is_open f.dom :=
+by rw [←pfun.preimage_univ]; exact h _ is_open_univ
+
+theorem pcontinuous_iff' {f : α →. β} :
+  pcontinuous f ↔ ∀ {x y} (h : y ∈ f x), ptendsto' f (nhds x) (nhds y) :=
+begin
+  split,
+  { intros h x y h',
+    rw [ptendsto'_def, nhds_sets, nhds_sets],
+    rintros s ⟨t, tsubs, opent, yt⟩,
+    exact ⟨f.preimage t, pfun.preimage_mono _ tsubs, h _ opent, ⟨y, yt, h'⟩⟩
+  },
+  intros hf s os,
+  rw is_open_iff_nhds,
+  rintros x ⟨y, ys, fxy⟩ t,
+  rw [mem_principal_sets],
+  assume h : f.preimage s ⊆ t,
+  apply mem_sets_of_superset _ h,
+  have h' : ∀ s ∈ (nhds y).sets, f.preimage s ∈ (nhds x).sets,
+  { intros s hs, 
+     have : ptendsto' f (nhds x) (nhds y) := hf fxy, 
+     rw ptendsto'_def at this, 
+     exact this s hs },
+  show f.preimage s ∈ (nhds x).sets,
+  apply h', rw nhds_sets, exact ⟨s, set.subset.refl _, os, ys⟩
+end
+
+end
+
+/- nhds within a metric space -/
 
 namespace metric
 
@@ -776,10 +998,7 @@ by rw [ptendsto_iff_rtendsto, rtendsto_nhds_within, pfun.graph']
 
 theorem tendsto_nhds_within (f : α → β) (a : α) (s : set α) (l : filter β) :
   tendsto f (nhds_within a s) l ↔ ∀ t ∈ l.sets, ∃ δ > 0, ∀ x ∈ s, dist x a < δ → f x ∈ t :=
-by rw [tendsto_iff_ptendsto', ptendsto_nhds_within, pfun.res_univ]; 
+by rw [tendsto_iff_ptendsto_univ, ptendsto_nhds_within, pfun.res_univ]; 
     simp only [pfun.coe_val, roption.mem_some_iff, forall_eq]
 
 end metric
-
-
-
