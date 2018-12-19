@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2018 Andreas Swerdlow. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Andreas Swerdlow
+-/
+
 import analysis.normed_space linear_algebra.sesquilinear_form data.complex.basic analysis.metric_space
  
 open vector_space field set complex real
