@@ -94,7 +94,7 @@ open herm_inner_product_space ring_invo
 
 noncomputable def inprod : α → α → ℂ := (to_sym_sesquilinear_form_space α).sesq  
 
-infix `₀` : 100 := inprod 
+infix `₀` : 74 := inprod 
  
 noncomputable instance herm_to_module : module ℂ α := 
 (herm_inner_product_space.to_sym_sesquilinear_form_space α).to_sesquilinear_form_space.to_module
