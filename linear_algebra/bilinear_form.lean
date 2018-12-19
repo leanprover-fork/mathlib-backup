@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2018 Andreas Swerdlow. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Andreas Swerdlow
+-/
+
 import algebra.module
 
 class bilinear_form_space (R : Type*) (V : Type*) [ring R] extends module R V :=
