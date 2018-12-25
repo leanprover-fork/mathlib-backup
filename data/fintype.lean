@@ -5,7 +5,7 @@ Author: Mario Carneiro
 
 Finite types.
 -/
-import data.finset algebra.big_operators data.array.lemmas data.vector2
+import data.finset algebra.big_operators data.array.lemmas data.vector2 data.equiv.encodable
 universes u v
 
 variables {α : Type*} {β : Type*} {γ : Type*}
@@ -165,6 +165,15 @@ theorem card_eq {α β} [F : fintype α] [G : fintype β] : card α = card β �
     { simp [nd₁] } }
 end end, λ ⟨f⟩, card_congr f⟩
 
+def of_subsingleton (a : α) [subsingleton α] : fintype α :=
+⟨finset.singleton a, λ b, finset.mem_singleton.2 (subsingleton.elim _ _)⟩
+
+@[simp] theorem fintype.univ_of_subsingleton (a : α) [subsingleton α] :
+  @univ _ (of_subsingleton a) = finset.singleton a := rfl
+
+@[simp] theorem fintype.card_of_subsingleton (a : α) [subsingleton α] :
+  @fintype.card _ (of_subsingleton a) = 1 := rfl
+
 end fintype
 
 instance (n : ℕ) : fintype (fin n) :=
@@ -187,13 +196,13 @@ instance : fintype pempty := ⟨∅, pempty.rec _⟩
 
 @[simp] theorem fintype.card_pempty : fintype.card pempty = 0 := rfl
 
-instance : fintype unit := ⟨⟨()::0, by simp⟩, λ ⟨⟩, by simp⟩
+instance : fintype unit := fintype.of_subsingleton ()
 
 @[simp] theorem fintype.univ_unit : @univ unit _ = {()} := rfl
 
 @[simp] theorem fintype.card_unit : fintype.card unit = 1 := rfl
 
-instance : fintype punit := ⟨⟨punit.star::0, by simp⟩, λ ⟨⟩, by simp⟩
+instance : fintype punit := fintype.of_subsingleton punit.star
 
 @[simp] theorem fintype.univ_punit : @univ punit _ = {punit.star} := rfl
 
@@ -205,6 +214,10 @@ instance : fintype bool := ⟨⟨tt::ff::0, by simp⟩, λ x, by cases x; simp�
 
 instance units_int.fintype : fintype (units ℤ) :=
 ⟨{1, -1}, λ x, by cases int.units_eq_one_or x; simp *⟩
+
+instance additive.fintype : Π [fintype α], fintype (additive α) := id
+
+instance multiplicative.fintype : Π [fintype α], fintype (multiplicative α) := id
 
 @[simp] theorem fintype.card_units_int : fintype.card (units ℤ) = 2 := rfl
 
@@ -306,6 +319,13 @@ match n, hn with
     (λ _ _ _, h _ _))⟩
 end
 
+lemma fintype.exists_ne_of_card_gt_one [fintype α] (h : fintype.card α > 1) (a : α) :
+  ∃ b : α, b ≠ a :=
+let ⟨b, hb⟩ := classical.not_forall.1 (mt fintype.card_le_one_iff.2 (not_le_of_gt h)) in
+let ⟨c, hc⟩ := classical.not_forall.1 hb in
+by haveI := classical.dec_eq α; exact
+if hba : b = a then ⟨c, by cc⟩ else ⟨b, hba⟩
+
 lemma fintype.injective_iff_surjective [fintype α] {f : α → α} : injective f ↔ surjective f :=
 by haveI := classical.prop_decidable; exact
 have ∀ {f : α → α}, injective f → surjective f,
@@ -386,6 +406,10 @@ d_array.fintype
 
 instance vector.fintype {α : Type*} [fintype α] {n : ℕ} : fintype (vector α n) :=
 fintype.of_equiv _ (equiv.vector_equiv_fin _ _).symm
+
+@[simp] lemma card_vector [fintype α] (n : ℕ) :
+  fintype.card (vector α n) = fintype.card α ^ n :=
+by rw fintype.of_equiv_card; simp
 
 instance quotient.fintype [fintype α] (s : setoid α)
   [decidable_rel ((≈) : α → α → Prop)] : fintype (quotient s) :=
@@ -588,3 +612,52 @@ fintype.card_congr (equiv_congr (equiv.refl α) e) ▸ fintype.card_perm
 
 end equiv
 
+namespace fintype
+
+section choose
+open fintype
+open equiv
+
+variables [fintype α] [decidable_eq α] (p : α → Prop) [decidable_pred p]
+
+def choose_x (hp : ∃! a : α, p a) : {a // p a} :=
+⟨finset.choose p univ (by simp; exact hp), finset.choose_property _ _ _⟩
+
+def choose (hp : ∃! a, p a) : α := choose_x p hp
+
+lemma choose_spec (hp : ∃! a, p a) : p (choose p hp) :=
+(choose_x p hp).property
+
+end choose
+
+section bijection_inverse
+open function
+
+variables [fintype α] [decidable_eq α]
+variables [fintype β] [decidable_eq β]
+variables {f : α → β} 
+
+/-- `
+`bij_inv f` is the unique inverse to a bijection `f`. This acts
+  as a computable alternative to `function.inv_fun`. -/
+def bij_inv (f_bij : bijective f) (b : β) : α :=
+fintype.choose (λ a, f a = b)
+begin
+  rcases f_bij.right b with ⟨a', fa_eq_b⟩,
+  rw ← fa_eq_b,
+  exact ⟨a', ⟨rfl, (λ a h, f_bij.left h)⟩⟩
+end
+
+lemma left_inverse_bij_inv (f_bij : bijective f) : left_inverse (bij_inv f_bij) f :=
+λ a, f_bij.left (choose_spec (λ a', f a' = f a) _)
+
+lemma right_inverse_bij_inv (f_bij : bijective f) : right_inverse (bij_inv f_bij) f :=
+λ b, choose_spec (λ a', f a' = b) _
+
+lemma bijective_bij_inv (f_bij : bijective f) : bijective (bij_inv f_bij) :=
+⟨injective_of_left_inverse (right_inverse_bij_inv _),
+    surjective_of_has_right_inverse ⟨f, left_inverse_bij_inv _⟩⟩ 
+
+end bijection_inverse
+
+end fintype

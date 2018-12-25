@@ -160,6 +160,9 @@ by haveI := classical.prop_decidable;
 theorem exists_mem_of_ne_empty {s : set α} : s ≠ ∅ → ∃ x, x ∈ s :=
 ne_empty_iff_exists_mem.1
 
+theorem coe_nonempty_iff_ne_empty {s : set α} : nonempty s ↔ s ≠ ∅ :=
+nonempty_subtype.trans ne_empty_iff_exists_mem.symm
+
 -- TODO: remove when simplifier stops rewriting `a ≠ b` to `¬ a = b`
 theorem not_eq_empty_iff_exists {s : set α} : ¬ (s = ∅) ↔ ∃ x, x ∈ s :=
 ne_empty_iff_exists_mem
@@ -196,15 +199,17 @@ by simp [ext_iff]
 
 theorem eq_univ_of_forall {s : set α} : (∀ x, x ∈ s) → s = univ := eq_univ_iff_forall.2
 
+@[simp] lemma univ_eq_empty_iff {α : Type*} : (univ : set α) = ∅ ↔ ¬ nonempty α :=
+eq_empty_iff_forall_not_mem.trans ⟨λ H ⟨x⟩, H x trivial, λ H x _, H ⟨x⟩⟩
+
 lemma nonempty_iff_univ_ne_empty {α : Type*} : nonempty α ↔ (univ : set α) ≠ ∅ :=
-begin
-  split,
-  { rintro ⟨a⟩ H2,
-    show a ∈ (∅ : set α), by rw ←H2 ; trivial },
-  { intro H,
-    cases exists_mem_of_ne_empty H with a _,
-    exact ⟨a⟩ }
-end
+by classical; exact iff_not_comm.1 univ_eq_empty_iff
+
+lemma exists_mem_of_nonempty (α) : ∀ [nonempty α], ∃x:α, x ∈ (univ : set α)
+| ⟨x⟩ := ⟨x, trivial⟩
+
+@[simp] lemma univ_ne_empty {α} [h : nonempty α] : (univ : set α) ≠ ∅ :=
+λ e, univ_eq_empty_iff.1 e h
 
 instance univ_decidable : decidable_pred (@set.univ α) :=
 λ x, is_true trivial
@@ -358,10 +363,10 @@ by finish [subset_def, ext_iff, iff_def]
 theorem inter_eq_self_of_subset_right {s t : set α} (h : t ⊆ s) : s ∩ t = t :=
 by finish [subset_def, ext_iff, iff_def]
 
-theorem union_inter_cancel_left {s t : set α} (h : s ∩ t ⊆ ∅) : (s ∪ t) ∩ s = s :=
+theorem union_inter_cancel_left {s t : set α} : (s ∪ t) ∩ s = s :=
 by finish [ext_iff, iff_def]
 
-theorem union_inter_cancel_right {s t : set α} (h : s ∩ t ⊆ ∅) : (s ∪ t) ∩ t = t :=
+theorem union_inter_cancel_right {s t : set α} : (s ∪ t) ∩ t = t :=
 by finish [ext_iff, iff_def]
 
 -- TODO(Mario): remove?
@@ -824,6 +829,10 @@ eq_univ_of_forall $ by simp [image]; exact H
 @[simp] theorem image_singleton {f : α → β} {a : α} : f '' {a} = {f a} :=
 ext $ λ x, by simp [image]; rw eq_comm
 
+@[simp] lemma image_eq_empty {α β} {f : α → β} {s : set α} : f '' s = ∅ ↔ s = ∅ :=
+by simp only [eq_empty_iff_forall_not_mem]; exact
+⟨λ H a ha, H _ ⟨_, ha, rfl⟩, λ H b ⟨_, ha, _⟩, H _ ha⟩
+
 lemma inter_singleton_ne_empty {α : Type*} {s : set α} {a : α} : s ∩ {a} ≠ ∅ ↔ a ∈ s :=
 by finish  [set.inter_singleton_eq_empty]
 
@@ -1011,6 +1020,9 @@ begin
   exact ⟨y⟩
 end
 
+@[simp] lemma range_eq_empty {α : Type u} {β : Type v} {f : α → β} : range f = ∅ ↔ ¬ nonempty α :=
+by rw ← set.image_univ; simp [-set.image_univ]
+
 theorem image_preimage_eq_inter_range {f : α → β} {t : set β} :
   f '' (f ⁻¹' t) = t ∩ range f :=
 ext $ assume x, ⟨assume ⟨x, hx, heq⟩, heq ▸ ⟨hx, mem_range_self _⟩,
@@ -1027,7 +1039,7 @@ by rw [image_preimage_eq_inter_range, preimage_inter_range]
 @[simp] theorem quot_mk_range_eq [setoid α] : range (λx : α, ⟦x⟧) = univ :=
 range_iff_surjective.2 quot.exists_rep
 
-lemma subtype_val_range {p : α → Prop} :
+@[simp] lemma subtype_val_range {p : α → Prop} :
   range (@subtype.val _ p) = {x | p x} :=
 by rw ← image_univ; simp [-image_univ, subtype_val_image]
 
@@ -1035,6 +1047,14 @@ end range
 
 /-- The set `s` is pairwise `r` if `r x y` for all *distinct* `x y ∈ s`. -/
 def pairwise_on (s : set α) (r : α → α → Prop) := ∀ x ∈ s, ∀ y ∈ s, x ≠ y → r x y
+
+theorem pairwise_on.mono {s t : set α} {r}
+  (h : t ⊆ s) (hp : pairwise_on s r) : pairwise_on t r :=
+λ x xt y yt, hp x (h xt) y (h yt)
+
+theorem pairwise_on.mono' {s : set α} {r r' : α → α → Prop}
+  (H : ∀ a b, r a b → r' a b) (hp : pairwise_on s r) : pairwise_on s r' :=
+λ x xs y ys h, H _ _ (hp x xs y ys h)
 
 end set
 

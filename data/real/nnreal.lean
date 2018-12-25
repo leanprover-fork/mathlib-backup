@@ -14,17 +14,6 @@ classical.by_cases (assume : a = 0, by simp [*])(assume : a ≠ 0, by simp [*, i
 
 end discrete_field
 
-namespace set
-
-@[simp] lemma image_eq_empty {α β} {f : α → β} {s : set α} : f '' s = ∅ ↔ s = ∅ :=
-begin
-  simp [eq_empty_iff_forall_not_mem],
-  exact iff.intro
-    (assume h a has, h (f a) a has rfl)
-    (assume h b a has eq, h a has)
-end
-
-end set
 
 noncomputable theory
 open lattice
@@ -81,11 +70,13 @@ begin
           add_comm_monoid.zero] }
 end
 
+instance : is_semiring_hom (coe : ℝ≥0 → ℝ) := by refine_struct {..}; intros; refl
+
 lemma sum_coe {α} {s : finset α} {f : α → ℝ≥0} : ↑(s.sum f) = s.sum (λa, (f a : ℝ)) :=
-eq.symm $ finset.sum_hom _ rfl (assume a b, rfl)
+eq.symm $ finset.sum_hom _
 
 lemma prod_coe {α} {s : finset α} {f : α → ℝ≥0} : ↑(s.prod f) = s.prod (λa, (f a : ℝ)) :=
-eq.symm $ finset.prod_hom _ rfl (assume a b, rfl)
+eq.symm $ finset.prod_hom _
 
 lemma smul_coe (r : ℝ≥0) : ∀n, ↑(add_monoid.smul n r) = add_monoid.smul n (r:ℝ)
 | 0       := rfl
@@ -199,6 +190,7 @@ instance : conditionally_complete_linear_order_bot ℝ≥0 :=
   le_cInf := assume s a hs h, show (↑a : ℝ) ≤ Inf ((coe : nnreal → ℝ) '' s), from
     le_cInf (by simp [hs]) $ assume r ⟨b, hb, eq⟩, eq ▸ h _ hb,
   cSup_empty := nnreal.eq $ by simp [coe_Sup, real.Sup_empty]; refl,
+  decidable_le := begin assume x y, apply classical.dec end,
   .. nnreal.linear_ordered_semiring, .. lattice.lattice_of_decidable_linear_order,
   .. nnreal.lattice.order_bot }
 
@@ -249,6 +241,9 @@ by simp [nnreal.of_real]; refl
 
 @[simp] lemma zero_lt_of_real (r : ℝ) : 0 < nnreal.of_real r ↔ 0 < r :=
 by simp [nnreal.of_real, nnreal.coe_lt, lt_max_iff, lt_irrefl]
+
+@[simp] lemma of_real_eq_zero (r : ℝ) : nnreal.of_real r = 0 ↔ r ≤ 0 :=
+by simpa [-zero_lt_of_real] using (not_iff_not.2 (zero_lt_of_real r))
 
 @[simp] lemma of_real_coe {r : nnreal} : nnreal.of_real r = r :=
 nnreal.eq $ by simp [nnreal.of_real, max_eq_left]
@@ -351,6 +346,11 @@ le_of_forall_ge_of_dense $ assume a ha,
   have a * x⁻¹ < 1, by rwa [← lt_inv_iff_mul_lt hx', inv_inv],
   have (a * x⁻¹) * x ≤ y, from h _ this,
   by rwa [mul_assoc, inv_mul_cancel hx, mul_one] at this
+
+lemma div_add_div_same (a b c : ℝ≥0) : a / c + b / c = (a + b) / c :=
+eq.symm $ right_distrib a b (c⁻¹)
+
+lemma add_halves (a : nnreal) : a / 2 + a / 2 = a := nnreal.eq (add_halves a)
 
 end inv
 

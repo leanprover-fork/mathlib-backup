@@ -47,19 +47,18 @@ def of_iso (f : r ≃o s) : r ≼i s :=
 @[refl] protected def refl (r : α → α → Prop) : r ≼i r :=
 ⟨order_embedding.refl _, λ a b h, ⟨_, rfl⟩⟩
 
-@[trans] protected def trans : r ≼i s → s ≼i t → r ≼i t
-| ⟨f₁, o₁⟩ ⟨f₂, o₂⟩ := ⟨f₁.trans f₂, λ a c h, begin
+@[trans] protected def trans (f : r ≼i s) (g : s ≼i t) : r ≼i t :=
+⟨f.1.trans g.1, λ a c h, begin
   simp at h ⊢,
-  rcases o₂ _ _ h with ⟨b, rfl⟩, have h := f₂.ord'.2 h,
-  rcases o₁ _ _ h with ⟨a', rfl⟩, exact ⟨a', rfl⟩
+  rcases g.2 _ _ h with ⟨b, rfl⟩, have h := g.1.ord'.2 h,
+  rcases f.2 _ _ h with ⟨a', rfl⟩, exact ⟨a', rfl⟩
 end⟩
 
 @[simp] theorem of_iso_apply (f : r ≃o s) (x : α) : of_iso f x = f x := rfl
 
 @[simp] theorem refl_apply (x : α) : initial_seg.refl r x = x := rfl
 
-@[simp] theorem trans_apply : ∀ (f : r ≼i s) (g : s ≼i t) (a : α), (f.trans g) a = g (f a)
-| ⟨f₁, o₁⟩ ⟨f₂, o₂⟩ a := order_embedding.trans_apply _ _ _
+@[simp] theorem trans_apply (f : r ≼i s) (g : s ≼i t) (a : α) : (f.trans g) a = g (f a) := rfl
 
 theorem unique_of_extensional [is_extensional β s] :
   well_founded r → subsingleton (r ≼i s) | ⟨h⟩ :=
@@ -81,15 +80,8 @@ instance [is_well_order β s] : subsingleton (r ≼i s) :=
 protected theorem eq [is_well_order β s] (f g : r ≼i s) (a) : f a = g a :=
 by rw subsingleton.elim f g
 
-theorem antisymm.aux [is_well_order α r] (f : r ≼i s) (g : s ≼i r) : left_inverse g f
-| x := begin
-  have := ((is_well_order.wf r).apply x), induction this with x _ IH,
-  refine @is_extensional.ext _ r _ _ _ (λ y, _),
-  simp only [g.init_iff, f.init_iff],
-  split; intro h,
-  { rcases h with ⟨a, rfl, b, rfl, h⟩, rwa IH _ h },
-  { exact ⟨f y, IH _ h, y, rfl, h⟩ }
-end
+theorem antisymm.aux [is_well_order α r] (f : r ≼i s) (g : s ≼i r) : left_inverse g f :=
+initial_seg.eq (f.trans g) (initial_seg.refl _)
 
 def antisymm [is_well_order β s] (f : r ≼i s) (g : s ≼i r) : r ≃o s :=
 by haveI := f.to_order_embedding.is_well_order; exact
@@ -619,11 +611,9 @@ enum_type (principal_seg.of_element r a)
 let ⟨a, e⟩ := typein_surj r h in
 by clear _let_match; subst e; rw enum_typein
 
-theorem enum_lt {α β} {r : α → α → Prop} {s : β → β → Prop} {t : γ → γ → Prop}
-  [is_well_order α r] [is_well_order β s] [is_well_order γ t]
-  (h₁ : type s < type r) (h₂ : type t < type r) :
-  r (enum r (type s) h₁) (enum r
-  (type t) h₂) ↔ type s < type t :=
+theorem enum_lt {r : α → α → Prop} [is_well_order α r]
+  {o₁ o₂ : ordinal} (h₁ : o₁ < type r) (h₂ : o₂ < type r) :
+  r (enum r o₁ h₁) (enum r o₂ h₂) ↔ o₁ < o₂ :=
 by rw [← typein_lt_typein r, typein_enum, typein_enum]
 
 theorem wf : @well_founded ordinal (<) :=
@@ -775,7 +765,7 @@ induction_on c $ λ β s _,
     | sum.inl a, sum.inr b, H := (sum.lex_inr_inl H).elim
     | sum.inr a, sum.inr b, H := let ⟨w, h⟩ := fi _ _ (sum.lex_inr_inr.1 H) in
         ⟨sum.inr w, congr_arg sum.inr h⟩
-    end⟩⟩
+  end⟩⟩
 
 theorem le_add_right (a b : ordinal) : a ≤ a + b :=
 by simpa only [add_zero] using add_le_add_left (zero_le b) a

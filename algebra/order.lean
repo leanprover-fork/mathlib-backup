@@ -22,6 +22,10 @@ lt_of_le_not_le h₁ $ mt (le_antisymm h₁) h₂
 lemma lt_iff_le_and_ne [partial_order α] {a b : α} : a < b ↔ a ≤ b ∧ a ≠ b :=
 ⟨λ h, ⟨le_of_lt h, ne_of_lt h⟩, λ ⟨h1, h2⟩, lt_of_le_of_ne h1 h2⟩
 
+lemma eq_iff_le_not_lt [partial_order α] {a b : α} : a = b ↔ a ≤ b ∧ ¬ a < b :=
+⟨λ h, ⟨le_of_eq h, h ▸ lt_irrefl _⟩, λ ⟨h₁, h₂⟩, le_antisymm h₁ $
+  classical.by_contradiction $ λ h₃, h₂ (lt_of_le_not_le h₁ h₃)⟩
+
 lemma eq_or_lt_of_le [partial_order α] {a b : α} (h : a ≤ b) : a = b ∨ a < b :=
 (lt_or_eq_of_le h).symm
 
@@ -107,6 +111,16 @@ le_of_not_lt $ λ h, lt_irrefl _ (H _ h)
 lemma eq_of_forall_ge_iff [partial_order α] {a b : α}
   (H : ∀ c, a ≤ c ↔ b ≤ c) : a = b :=
 le_antisymm ((H _).2 (le_refl _)) ((H _).1 (le_refl _))
+
+/-- monotonicity of `≤` with respect to `→` -/
+lemma le_implies_le_of_le_of_le {a b c d : α} [preorder α]
+   (h₀ : c ≤ a) (h₁ : b ≤ d) :
+  a ≤ b -> c ≤ d :=
+assume h₂ : a ≤ b,
+calc  c
+    ≤ a : h₀
+... ≤ b : h₂
+... ≤ d : h₁
 
 namespace decidable
 

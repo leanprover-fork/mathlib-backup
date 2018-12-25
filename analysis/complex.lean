@@ -5,7 +5,7 @@ Author: Mario Carneiro
 
 Topology of the complex numbers.
 -/
-import data.complex.basic analysis.metric_space
+import data.complex.basic analysis.metric_space analysis.real
 
 noncomputable theory
 open filter
@@ -93,9 +93,11 @@ tendsto_of_uniform_continuous_subtype
     (λ x, id))
   (mem_nhds_sets
     (is_open_prod
-      (continuous_abs _ $ is_open_gt' _)
-      (continuous_abs _ $ is_open_gt' _))
+      (continuous_abs _ $ is_open_gt' (abs a₁ + 1))
+      (continuous_abs _ $ is_open_gt' (abs a₂ + 1)))
     ⟨lt_add_one (abs a₁), lt_add_one (abs a₂)⟩)
+
+local attribute [semireducible] real.le
 
 lemma uniform_continuous_re : uniform_continuous re :=
 uniform_continuous_of_metric.2 (λ ε ε0, ⟨ε, ε0, λ _ _, lt_of_le_of_lt (abs_re_le_abs _)⟩)
@@ -118,5 +120,25 @@ instance : topological_ring ℂ :=
 { continuous_mul := complex.continuous_mul, ..complex.topological_add_group }
 
 instance : topological_semiring ℂ := by apply_instance
+
+def real_prod_homeo : homeomorph ℂ (ℝ × ℝ) :=
+{ to_equiv := real_prod_equiv,
+  continuous_to_fun := continuous.prod_mk continuous_re continuous_im,
+  continuous_inv_fun := show continuous (λ p : ℝ × ℝ, complex.mk p.1 p.2),
+    by simp only [mk_eq_add_mul_I]; exact
+    continuous_add
+      (continuous_fst.comp continuous_of_real)
+      (continuous_mul (continuous_snd.comp continuous_of_real) continuous_const) }
+
+instance : proper_space ℂ :=
+⟨λx r, begin
+  refine real_prod_homeo.symm.compact_preimage.1
+    (compact_of_is_closed_subset
+      (compact_prod _ _ (proper_space.compact_ball x.re r) (proper_space.compact_ball x.im r))
+      (continuous_iff_is_closed.1 real_prod_homeo.symm.continuous _ is_closed_ball) _),
+  exact λ p h, ⟨
+    le_trans (abs_re_le_abs (⟨p.1, p.2⟩ - x)) h,
+    le_trans (abs_im_le_abs (⟨p.1, p.2⟩ - x)) h⟩
+end⟩
 
 end complex
