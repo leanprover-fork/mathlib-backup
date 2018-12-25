@@ -95,7 +95,7 @@ open herm_inner_product_space ring_invo
 noncomputable def inprod : α → α → ℂ := (to_sym_sesquilinear_form_space α).sesq  
 
 infix `₀` : 74 := inprod 
- 
+
 noncomputable instance herm_to_module : module ℂ α := 
 (herm_inner_product_space.to_sym_sesquilinear_form_space α).to_sesquilinear_form_space.to_module
 
@@ -194,14 +194,12 @@ lemma mul_self_herm_norm (x : α) : |x| * |x| = (x ₀ x).re :=
 begin
   dunfold herm_norm,
   rw mul_self_sqrt (inprod_self_re_nonneg x),
-end --change uses of mul_self_sqrt to this
+end
 
 lemma herm_norm_sqr (x : α) : |x|^2 = (x ₀ x).re := 
 by rw pow_two; exact mul_self_herm_norm x
 
 open classical
-
---set_option pp.all true
 
 theorem abs_inprod_le_mul_herm_norm (x y : α) :
 abs((x ₀ y)) ≤ |x|*|y| := 
